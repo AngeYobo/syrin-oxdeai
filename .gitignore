@@ -2,6 +2,7 @@
 .cursor/rules/openmemory.mdc
 
 plan/
+openmemory.md
 
 # Python
 __pycache__/
