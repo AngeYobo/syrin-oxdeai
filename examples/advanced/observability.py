@@ -58,7 +58,7 @@ def example_debug_mode():
         return f"Sunny and 72°F in {location}"
 
     class WeatherAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful weather assistant."
         tools = [get_weather]
 
@@ -94,7 +94,7 @@ def example_manual_spans():
             return f"Error: {e}"
 
     class CalculatorAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful calculator. Use the calculate tool for math."
         tools = [calculate]
 
@@ -130,7 +130,7 @@ def example_session_tracking():
     tracer.add_exporter(ConsoleExporter())
 
     class ChatAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     # Create a session that groups all spans together
@@ -183,7 +183,7 @@ def example_semantic_attributes():
         return f"Found 3 results for: {query}"
 
     class RAGAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant with access to documentation."
         tools = [search_docs]
 
@@ -230,7 +230,7 @@ def example_nested_spans():
         return f"Processed: {data}"
 
     class DataAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a data processing assistant."
         tools = [fetch_data, process_data]
 
@@ -273,7 +273,7 @@ def example_error_tracking():
         return "Success!"
 
     class ErrorAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a testing agent. Use the risky_operation tool."
         tools = [risky_operation]
 
@@ -307,7 +307,7 @@ def example_cost_attribution():
     tracer.add_exporter(exporter)
 
     class CostAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     # Simulate different features using the agent
@@ -355,7 +355,7 @@ def example_global_config():
     syrin.configure(trace=True)
 
     class ConfigAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     # All agents now have tracing enabled by default
@@ -404,7 +404,7 @@ def example_custom_exporter():
     tracer.add_exporter(custom_exporter)
 
     class CustomAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = CustomAgent()

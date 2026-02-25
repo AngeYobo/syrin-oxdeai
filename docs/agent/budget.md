@@ -88,17 +88,17 @@ if tracker:
 
 ## Token limits (on Context)
 
-Budget is **USD only**. To cap **token usage** (e.g. per run or per hour), use **ContextBudget** on **Context** and pass `context=Context(budget=...)` on the agent:
+Budget is **USD only**. To cap **token usage** (e.g. per run or per hour), use **TokenLimits** on **Context** and pass `context=Context(budget=...)` on the agent:
 
 ```python
-from syrin import Agent, Budget, Context, ContextBudget, TokenRateLimit
+from syrin import Agent, Budget, Context, TokenLimits, TokenRateLimit
 from syrin.budget import raise_on_exceeded
 
 agent = Agent(
     model=model,
     budget=Budget(run=1.0),
     context=Context(
-        budget=ContextBudget(
+        budget=TokenLimits(
             run=10_000,
             per=TokenRateLimit(hour=50_000, day=200_000),
             on_exceeded=raise_on_exceeded,

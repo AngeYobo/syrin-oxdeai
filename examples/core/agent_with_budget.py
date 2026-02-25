@@ -35,7 +35,7 @@ def example_agent_with_budget() -> None:
     print("=" * 50)
 
     class Assistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
         budget = Budget(run=0.10, on_exceeded=warn_on_exceeded)
 
@@ -74,12 +74,12 @@ def example_shared_budget() -> None:
     print("=" * 50)
 
     class Manager(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a manager that coordinates tasks."
         budget = Budget(run=0.50, shared=True)
 
     class Worker(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a worker that executes tasks."
         budget = Budget(run=0.15)
 

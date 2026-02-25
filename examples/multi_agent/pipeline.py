@@ -49,15 +49,15 @@ def example_sequential_pipeline() -> None:
     print("=" * 50)
 
     class Researcher(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = researcher_prompt(domain="technology")
 
     class Writer(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = writer_prompt(style="professional")
 
     class Editor(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = editor_prompt()
 
     pipeline = Pipeline()
@@ -82,7 +82,7 @@ def example_parallel_pipeline() -> None:
     print("=" * 50)
 
     class Analyst(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are an analyst."
 
     pipeline = Pipeline()
@@ -108,11 +108,11 @@ def example_pipeline_with_budget() -> None:
     print("=" * 50)
 
     class Researcher(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = researcher_prompt(domain="science")
 
     class Writer(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = writer_prompt(style="concise")
 
     pipeline = Pipeline(budget=Budget(run=0.30))

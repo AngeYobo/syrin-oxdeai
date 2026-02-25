@@ -403,22 +403,6 @@ simulator = AttackSimulator()
 attacks = simulator.generate_jailbreak_attempts(target="sensitive info", count=10)
 ```
 
-### Legacy API (Backward Compatible)
-
-The old API still works for backward compatibility:
-
-```python
-from Syrin.guardrails import BlockedWordsGuardrail, LengthGuardrail
-
-# Old-style guardrails (sync, simple)
-blocked = BlockedWordsGuardrail(blocked_words=["spam"])
-result = blocked.check("Hello world", stage="input")
-```
-
-> **Note**: Legacy guardrails are automatically wrapped for backward compatibility. New code should use the modern API for full features.
-
----
-
 ## Loop Strategies
 
 Control how your agent iterates when handling tasks.
@@ -593,7 +577,7 @@ Putting it all together:
 ```python
 from Syrin import Agent, Model, Budget
 from Syrin.checkpoint import Checkpointer
-from Syrin.guardrails import GuardrailChain, BlockedWordsGuardrail
+from Syrin.guardrails import GuardrailChain, ContentFilter
 from Syrin.loop import ReactLoop
 from Syrin.observability import trace, ConsoleExporter
 from Syrin.enums import Hook, RateWindow
@@ -607,7 +591,7 @@ budget = Budget(
 
 # 2. Configure guardrails
 guardrails = GuardrailChain([
-    BlockedWordsGuardrail(blocked_words=["illegal", "harmful"]),
+    ContentFilter(blocked_words=["illegal", "harmful"]),
 ])
 
 # 3. Configure observability - add exporters to tracer

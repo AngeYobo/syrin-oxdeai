@@ -49,7 +49,7 @@ def example_simple_logging():
     print("=" * 50)
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
     )
 
@@ -72,7 +72,7 @@ def example_track_cost():
         total_cost["total"] += ctx.get("cost", 0)
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
     )
 
@@ -95,7 +95,7 @@ def example_listen_to_all():
         print(f"  [{event.value if hasattr(event, 'value') else event}]")
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
     )
 
@@ -121,7 +121,7 @@ def example_before_after():
         calls.append("after_request")
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
     )
 
@@ -147,7 +147,7 @@ def example_tool_tracking():
         return str(eval(expr))
 
     class CalcAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "Use the calculate tool for math."
         tools = [calculate]
 

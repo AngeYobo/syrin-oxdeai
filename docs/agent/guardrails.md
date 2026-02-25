@@ -8,17 +8,17 @@ Validate input and output before and after processing.
 
 ```python
 from syrin import Agent
-from syrin.guardrails import BlockedWordsGuardrail
+from syrin.guardrails import ContentFilter
 
 agent = Agent(
     model=model,
-    guardrails=[BlockedWordsGuardrail(["spam", "offensive"])],
+    guardrails=[ContentFilter(blocked_words=["spam", "offensive"])],
 )
 ```
 
 ## Built-in Guardrails
 
-- **BlockedWordsGuardrail** — Block inputs containing specific words
+- **ContentFilter** — Block inputs containing specific words
 - **LengthGuardrail** — Enforce min/max length
 
 ## Custom Guardrail

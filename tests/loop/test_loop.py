@@ -4,6 +4,8 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 from syrin import Agent
+from syrin.agent._run_context import DefaultAgentRunContext
+from syrin.enums import MessageRole
 from syrin.loop import (
     HITL,
     REACT,
@@ -13,7 +15,15 @@ from syrin.loop import (
     ReactLoop,
     SingleShotLoop,
 )
-from syrin.types import ModelConfig, TokenUsage, ToolCall
+from syrin.types import Message, ModelConfig, TokenUsage, ToolCall
+
+
+def _run_ctx(mock_agent: MagicMock) -> DefaultAgentRunContext:
+    """Wrap a mock agent so loop receives AgentRunContext. Ensures _build_messages returns a list."""
+    mock_agent._build_messages = MagicMock(
+        return_value=[Message(role=MessageRole.USER, content="test")]
+    )
+    return DefaultAgentRunContext(mock_agent)
 
 
 class TestLoopResult:
@@ -86,7 +96,7 @@ class TestSingleShotLoop:
         mock_agent._model_config.model_id = "gpt-4o"
         mock_agent._emit_event = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
         assert result.iterations == 1
 
     def test_populates_cost(self):
@@ -108,7 +118,7 @@ class TestSingleShotLoop:
         mock_agent._model = None
         mock_agent._emit_event = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         # Cost should be calculated (gpt-4o-mini pricing: $0.00015/1k input, $0.0006/1k output)
         assert result.cost_usd > 0
@@ -133,7 +143,7 @@ class TestSingleShotLoop:
         mock_agent._model = None
         mock_agent._emit_event = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         assert result.token_usage == {"input": 100, "output": 50, "total": 150}
 
@@ -158,7 +168,7 @@ class TestSingleShotLoop:
         mock_agent._model = None
         mock_agent._emit_event = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0]["id"] == "call_123"
@@ -186,7 +196,7 @@ class TestSingleShotLoop:
         mock_agent._model = None
         mock_agent._emit_event = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         assert result.raw_response == raw_response_data
 
@@ -209,7 +219,7 @@ class TestSingleShotLoop:
         mock_agent._model = None
         mock_agent._emit_event = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         assert result.content == ""
         assert result.cost_usd == 0.0
@@ -248,7 +258,7 @@ class TestReactLoop:
         mock_agent._emit_event = MagicMock()
         mock_agent._check_and_apply_budget = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         assert result.cost_usd > 0
         assert result.iterations == 1
@@ -275,7 +285,7 @@ class TestReactLoop:
         mock_agent._emit_event = MagicMock()
         mock_agent._check_and_apply_budget = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         assert result.token_usage == {"input": 200, "output": 100, "total": 300}
 
@@ -320,7 +330,7 @@ class TestReactLoop:
         mock_agent._emit_event = MagicMock()
         mock_agent._check_and_apply_budget = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         # tools_used should track all tools across iterations
         assert "search" in result.tools_used
@@ -348,7 +358,7 @@ class TestReactLoop:
         mock_agent._emit_event = MagicMock()
         mock_agent._check_and_apply_budget = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         assert result.iterations == 1
         assert result.tools_used == []
@@ -402,7 +412,7 @@ class TestHumanInTheLoop:
         mock_agent._emit_event = MagicMock()
         mock_agent._check_and_apply_budget = MagicMock()
 
-        asyncio.run(loop.run(mock_agent, "test"))
+        asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         assert len(approval_calls) == 1
         assert approval_calls[0][0] == "search"
@@ -428,7 +438,7 @@ class TestHumanInTheLoop:
         mock_agent._emit_event = MagicMock()
         mock_agent._check_and_apply_budget = MagicMock()
 
-        asyncio.run(loop.run(mock_agent, "test"))
+        asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         assert len(approval_calls) == 1
         assert approval_calls[0][0] == "search"
@@ -454,7 +464,7 @@ class TestHumanInTheLoop:
         mock_agent._emit_event = MagicMock()
         mock_agent._check_and_apply_budget = MagicMock()
 
-        asyncio.run(loop.run(mock_agent, "test"))
+        asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         # Tool should NOT have been executed
         mock_agent.execute_tool.assert_not_called()
@@ -481,7 +491,7 @@ class TestHumanInTheLoop:
         mock_agent._model = None
         mock_agent._emit_event = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         assert result.cost_usd > 0
 
@@ -507,7 +517,7 @@ class TestHumanInTheLoop:
         mock_agent._model = None
         mock_agent._emit_event = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
 
         assert result.token_usage == {"input": 250, "output": 75, "total": 325}
 
@@ -790,7 +800,7 @@ class TestLoopEdgeCases:
         mock_agent._model = None
         mock_agent._emit_event = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
         assert len(result.content) == 100000
         assert result.cost_usd > 0
 
@@ -812,7 +822,7 @@ class TestLoopEdgeCases:
         mock_agent._emit_event = MagicMock()
         mock_agent._check_and_apply_budget = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "test"))
         assert result.iterations == 1  # Only 1 since no tool calls
 
     def test_loop_with_custom_stop_reason(self):

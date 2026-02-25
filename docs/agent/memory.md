@@ -1,6 +1,6 @@
 # Memory
 
-> **Full config & backends:** For MemoryConfig, backends (Redis, Chroma, etc.), memory types, decay, and standalone usage, see [Memory System](../memory.md).
+> **Full config & backends:** For Memory, backends (Redis, Chroma, etc.), memory types, decay, and standalone usage, see [Memory System](../memory.md).
 
 Agents have two kinds of memory: **persistent memory** and **conversation memory**.
 
@@ -69,17 +69,17 @@ deleted = agent.forget(memory_type=MemoryType.EPISODIC)
 
 ---
 
-## MemoryConfig
+## Memory
 
-Control behavior via `memory=MemoryConfig(...)`:
+Control behavior via `memory=Memory(...)`:
 
 ```python
-from syrin.memory.config import Memory as MemoryConfig
+from syrin.memory.config import Memory as Memory
 from syrin.enums import MemoryType, MemoryBackend
 
 agent = Agent(
     model=model,
-    memory=MemoryConfig(
+    memory=Memory(
         backend=MemoryBackend.MEMORY,
         types=[MemoryType.CORE, MemoryType.EPISODIC],
         top_k=10,

@@ -12,7 +12,7 @@ How to **keep your AI costs under control**. Perfect for:
 
 AI API calls cost money. Syrin helps you manage and monitor every dollar.
 
-**Budget = real money (USD).** All limits and thresholds here are about **spend**. Token usage caps live on **Context**: use **ContextBudget** (run, per, on_exceeded) and pass `context=Context(budget=ContextBudget(...))` on the agent, so Budget stays strictly about dollars.
+**Budget = real money (USD).** All limits and thresholds here are about **spend**. Token usage caps live on **Context**: use **TokenLimits** (run, per, on_exceeded) and pass `context=Context(budget=TokenLimits(...))` on the agent, so Budget stays strictly about dollars.
 
 ## The Idea
 
@@ -177,15 +177,15 @@ self.budget = Budget(
 
 ### 5. Token limits (separate from Budget)
 
-**Budget = real money (USD) only.** Token usage caps are on **Context**: **ContextBudget**. Use `context=Context(budget=ContextBudget(...))` on the agent so you don't mix spend and usage.
+**Budget = real money (USD) only.** Token usage caps are on **Context**: **TokenLimits**. Use `context=Context(budget=TokenLimits(...))` on the agent so you don't mix spend and usage.
 
 ```python
-from syrin import Agent, Budget, Context, ContextBudget, Model, TokenRateLimit, raise_on_exceeded
+from syrin import Agent, Budget, Context, TokenLimits, Model, TokenRateLimit, raise_on_exceeded
 
 agent = Agent(
     model=Model("openai/gpt-4o-mini"),
     budget=Budget(run=0.10, on_exceeded=raise_on_exceeded),  # USD only
-    context=Context(budget=ContextBudget(
+    context=Context(budget=TokenLimits(
         run=10_000,
         per=TokenRateLimit(hour=50_000, day=200_000),
         on_exceeded=raise_on_exceeded,
@@ -588,7 +588,7 @@ A: It depends on your `on_exceeded` callback:
 - Pass `warn_on_exceeded`: logs a warning and continues
 - Pass `raise_on_exceeded`: raises `BudgetExceededError` and stops
 
-When a limit is exceeded, the error message and `BudgetExceededError.budget_type` (a string) tell you which limit was hit. `BudgetExceededContext.budget_type` and `CheckBudgetResult.exceeded_limit` use the `BudgetLimitType` enum (e.g. `BudgetLimitType.RUN`, `BudgetLimitType.HOUR_TOKENS`) for type-safe checks.
+When a limit is exceeded, the error message and `BudgetExceededError.budget_type` (a string) tell you which limit was hit. `BudgetExceededContext.budget_type` and `CheckBudgetResult.exceeded_limit` use the `BudgetLimitType` enum (e.g. `BudgetLimitType.RUN`, `BudgetLimitType.HOUR_TOKENS`) for type-safe checks. Use `result.status == BudgetStatus.EXCEEDED` when checking `check_budget()` results (the result is a `CheckBudgetResult`, not a `BudgetStatus`).
 
 **Q: Can I see all my costs?**
 A: Yes! Check `response.cost` and track them over time.
@@ -656,13 +656,13 @@ Example: `Agent(..., budget_store=FileBudgetStore("/data/budget.json"), budget_s
 
 ## Budget reference (what’s available)
 
-**Budget** = spend in USD. **Token caps** are usage limits on Context; use **ContextBudget** and pass `context=Context(budget=...)` on the agent.
+**Budget** = spend in USD. **Token caps** are usage limits on Context; use **TokenLimits** and pass `context=Context(budget=...)` on the agent.
 
 | Feature | Where | Description |
 |--------|--------|--------------|
 | **Run limit** | `Budget(run=..., reserve=...)` | Max **USD** per request; effective limit is `run - reserve`. |
 | **Rate limits (spend)** | `Budget(per=RateLimit(...))` | Max **USD** per period: `hour`, `day`, `week`, `month`. |
-| **Token limits (Context)** | `Agent(..., context=Context(budget=ContextBudget(...)))` | Token caps live on Context. Use `ContextBudget(run=..., per=TokenRateLimit(...))` on Context. |
+| **Token limits (Context)** | `Agent(..., context=Context(budget=TokenLimits(...)))` | Token caps live on Context. Use `TokenLimits(run=..., per=TokenRateLimit(...))` on Context. |
 | **month_days** | `RateLimit(month=..., month_days=N)` | Month = last N days (1–31). Default 30. |
 | **calendar_month** | `RateLimit(month=..., calendar_month=True)` | Month = current calendar month only (e.g. 1–30 Nov). |
 | **on_exceeded** | `Budget(on_exceeded=...)` | Callback when a limit is exceeded; receives `BudgetExceededContext` with `budget_type` (`BudgetLimitType`). |

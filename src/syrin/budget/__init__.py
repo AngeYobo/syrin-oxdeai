@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, PrivateAttr, model_validator
 from syrin.cost import ModelPricing, Pricing
 from syrin.enums import BudgetLimitType, ThresholdMetric, ThresholdWindow
 from syrin.exceptions import BudgetExceededError, BudgetThresholdError
-from syrin.threshold import BudgetThreshold, Threshold, ThresholdContext
+from syrin.threshold import BudgetThreshold, ThresholdContext
 from syrin.types import CostInfo, TokenUsage
 
 _log = logging.getLogger(__name__)
@@ -37,7 +37,6 @@ __all__ = [
     "TokenRateLimit",
     "raise_on_exceeded",
     "stop_on_exceeded",
-    "Threshold",
     "BudgetThreshold",
     "warn_on_exceeded",
 ]
@@ -95,12 +94,6 @@ class CheckBudgetResult:
     status: BudgetStatus
     exceeded_limit: BudgetLimitType | None = None
 
-    def __eq__(self, other: object) -> bool:
-        """Allow comparison with BudgetStatus for backward compatibility."""
-        if isinstance(other, BudgetStatus):
-            return self.status == other
-        return NotImplemented
-
 
 class RateLimit(BaseModel):
     """Rate-based cost limits in USD per window. For token caps use TokenLimits and TokenRateLimit."""
@@ -127,12 +120,12 @@ class TokenRateLimit(BaseModel):
     **What:** Optional limits per hour, day, week, month. Same shape as RateLimit
     (cost) but in tokens.
 
-    **How:** Pass as ContextBudget.per (or TokenLimits.per). The budget tracker
+    **How:** Pass as TokenLimits.per. The budget tracker
     enforces these after each LLM call.
 
     Example:
-        >>> from syrin import Context, ContextBudget, Model
-        >>> Context(budget=ContextBudget(per=TokenRateLimit(hour=100_000, day=400_000)))
+        >>> from syrin import Context, TokenLimits, TokenRateLimit
+        >>> Context(budget=TokenLimits(per=TokenRateLimit(hour=100_000, day=400_000)))
     """
 
     hour: int | None = Field(
@@ -169,7 +162,7 @@ class TokenLimits(BaseModel):
     caps (TokenRateLimit). When a limit is exceeded, on_exceeded is called; raise
     to stop the run, return to continue.
 
-    **How:** Use as Context.budget: Context(budget=ContextBudget(run=50_000, ...)).
+    **How:** Use as Context.budget: Context(budget=TokenLimits(run=50_000, ...)).
     The agent's budget tracker enforces limits after each LLM call.
 
     Example:
@@ -279,11 +272,6 @@ class Budget(BaseModel):
             return None
         effective = self.run - self.reserve
         return max(0.0, effective - self._spent)
-
-    @property
-    def limit(self) -> float | None:
-        """Alias for run (for BudgetEnforcer compatibility)."""
-        return self.run
 
     def _set_spent(self, amount: float) -> None:
         """Internal method to track spent amount. Called by BudgetTracker."""

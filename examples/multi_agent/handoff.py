@@ -46,11 +46,11 @@ def example_handoff() -> None:
     print("=" * 50)
 
     class Analyzer(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = analyzer_prompt()
 
     class Presenter(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = presenter_prompt()
 
     analyzer = Analyzer()
@@ -73,11 +73,11 @@ def example_handoff_with_context() -> None:
     print("=" * 50)
 
     class Analyzer(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = analyzer_prompt()
 
     class Presenter(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = presenter_prompt()
 
     analyzer = Analyzer(memory=Memory())

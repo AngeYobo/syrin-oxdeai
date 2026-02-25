@@ -146,7 +146,7 @@ class TestMultiAgentIntegration:
 
         agent = Agent(model=Model("openai/gpt-4o-mini"))
 
-        with patch("syrin.agent._get_provider") as mock_provider:
+        with patch("syrin.agent._resolve_provider") as mock_provider:
             mock_provider.return_value = AsyncMock()
             mock_provider.return_value.complete = AsyncMock(
                 return_value=ProviderResponse(
@@ -168,7 +168,7 @@ class TestMultiAgentIntegration:
 
         parent = Agent(model=Model("openai/gpt-4o-mini"))
 
-        with patch("syrin.agent._get_provider") as mock_provider:
+        with patch("syrin.agent._resolve_provider") as mock_provider:
             mock_provider.return_value = MagicMock()
 
             child = parent.spawn(Child)

@@ -47,7 +47,7 @@ class ThresholdContext:
     """Event object passed to threshold actions (Budget, Context, RateLimit).
 
     Use when you need to react at a utilization percentage (e.g. compact at 75%).
-    For context thresholds, call **compact()** to run compaction. Alias: **ThresholdEvent**.
+    For context thresholds, call **compact()** to run compaction.
     """
 
     percentage: int
@@ -69,7 +69,6 @@ class ThresholdContext:
 
 
 # Alias: event passed to threshold action (avoids confusion with Context config).
-ThresholdEvent = ThresholdContext
 
 
 # Type alias for threshold action handlers
@@ -224,18 +223,13 @@ class RateLimitThreshold(BaseThreshold):
             raise ValueError(f"RateLimitThreshold only supports {valid_metrics}, got {metric_val}")
 
 
-# Alias for backwards compatibility
-Threshold = BudgetThreshold
-
 __all__ = [
     "ThresholdContext",
-    "ThresholdEvent",
     "ThresholdAction",
     "BaseThreshold",
     "BudgetThreshold",
     "ThresholdWindow",
     "ContextThreshold",
     "RateLimitThreshold",
-    "Threshold",  # backwards compat - same as BudgetThreshold
     "compact_if_available",
 ]

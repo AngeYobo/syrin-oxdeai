@@ -12,7 +12,6 @@ from syrin.budget import (
     BudgetTracker,
     CheckBudgetResult,
     RateLimit,
-    Threshold,
     TokenLimits,
     raise_on_exceeded,
     warn_on_exceeded,
@@ -36,8 +35,8 @@ def test_budget_model() -> None:
 
 
 def test_threshold_with_action() -> None:
-    """Threshold now takes a function as action."""
-    t = Threshold(
+    """BudgetThreshold now takes a function as action."""
+    t = BudgetThreshold(
         at=80, action=lambda ctx: print(f"Budget at {ctx.percentage}%"), metric=ThresholdMetric.COST
     )
     assert t.at == 80
@@ -46,7 +45,7 @@ def test_threshold_with_action() -> None:
 
 def test_threshold_with_lambda() -> None:
     """Test threshold with lambda action."""
-    t = Threshold(
+    t = BudgetThreshold(
         at=80, action=lambda ctx: print(f"At {ctx.percentage}%"), metric=ThresholdMetric.COST
     )
     assert t.at == 80
@@ -58,7 +57,7 @@ def test_threshold_with_function() -> None:
     def my_action(ctx):
         pass
 
-    t = Threshold(at=90, action=my_action, metric=ThresholdMetric.COST)
+    t = BudgetThreshold(at=90, action=my_action, metric=ThresholdMetric.COST)
     assert t.at == 90
 
 
@@ -75,7 +74,7 @@ def test_budget_tracker_check_budget_ok() -> None:
     tracker = BudgetTracker()
     tracker.record(CostInfo(cost_usd=0.1, token_usage=TokenUsage()))
     budget = Budget(run=5.0)
-    assert tracker.check_budget(budget) == BudgetStatus.OK
+    assert tracker.check_budget(budget).status == BudgetStatus.OK
 
 
 def test_budget_tracker_check_budget_exceeded() -> None:
@@ -83,7 +82,6 @@ def test_budget_tracker_check_budget_exceeded() -> None:
     tracker.record(CostInfo(cost_usd=10.0, token_usage=TokenUsage()))
     budget = Budget(run=5.0)
     result = tracker.check_budget(budget)
-    assert result == BudgetStatus.EXCEEDED  # backward compat
     assert result.status == BudgetStatus.EXCEEDED
     assert result.exceeded_limit == BudgetLimitType.RUN
 
@@ -154,7 +152,7 @@ def test_budget_tracker_check_budget_ok_and_threshold_have_no_exceeded_limit() -
     budget_with_threshold = Budget(
         run=5.0,
         thresholds=[
-            Threshold(at=10, action=lambda _: None, metric=ThresholdMetric.COST),
+            BudgetThreshold(at=10, action=lambda _: None, metric=ThresholdMetric.COST),
         ],
     )
     triggered = tracker.check_thresholds(budget_with_threshold)
@@ -172,7 +170,8 @@ def test_budget_tracker_check_thresholds() -> None:
     tracker = BudgetTracker()
     tracker.record(CostInfo(cost_usd=4.0, token_usage=TokenUsage()))
     budget = Budget(
-        run=5.0, thresholds=[Threshold(at=80, action=capture_action, metric=ThresholdMetric.COST)]
+        run=5.0,
+        thresholds=[BudgetThreshold(at=80, action=capture_action, metric=ThresholdMetric.COST)],
     )
     triggered = tracker.check_thresholds(budget)
     assert len(triggered) == 1
@@ -304,7 +303,7 @@ def test_rate_limit_very_high_values() -> None:
 def test_budget_with_very_many_thresholds() -> None:
     """Many threshold actions should work."""
     thresholds = [
-        Threshold(at=i, action=lambda _: None, metric=ThresholdMetric.COST)
+        BudgetThreshold(at=i, action=lambda _: None, metric=ThresholdMetric.COST)
         for i in range(0, 100, 5)
     ]
     b = Budget(run=10.0, thresholds=thresholds)
@@ -312,18 +311,18 @@ def test_budget_with_very_many_thresholds() -> None:
 
 
 def test_budget_threshold_edge_cases() -> None:
-    """Threshold at exact boundaries."""
-    t0 = Threshold(at=0, action=lambda _: None, metric=ThresholdMetric.COST)
+    """BudgetThreshold at exact boundaries."""
+    t0 = BudgetThreshold(at=0, action=lambda _: None, metric=ThresholdMetric.COST)
     assert t0.at == 0
 
-    t100 = Threshold(at=100, action=lambda _: None, metric=ThresholdMetric.COST)
+    t100 = BudgetThreshold(at=100, action=lambda _: None, metric=ThresholdMetric.COST)
     assert t100.at == 100
 
     with pytest.raises(ValueError):
-        Threshold(at=-1, action=lambda _: None, metric=ThresholdMetric.COST)
+        BudgetThreshold(at=-1, action=lambda _: None, metric=ThresholdMetric.COST)
 
     with pytest.raises(ValueError):
-        Threshold(at=101, action=lambda _: None, metric=ThresholdMetric.COST)
+        BudgetThreshold(at=101, action=lambda _: None, metric=ThresholdMetric.COST)
 
 
 def test_budget_tracker_very_many_entries() -> None:
@@ -342,7 +341,7 @@ def test_budget_tracker_check_budget_at_exact_limit() -> None:
     tracker.record(CostInfo(cost_usd=5.0, token_usage=TokenUsage()))
     budget = Budget(run=5.0)
     # At exact limit triggers EXCEEDED (uses >= not >)
-    assert tracker.check_budget(budget) == BudgetStatus.EXCEEDED
+    assert tracker.check_budget(budget).status == BudgetStatus.EXCEEDED
 
 
 def test_budget_tracker_check_budget_slightly_over() -> None:
@@ -350,7 +349,7 @@ def test_budget_tracker_check_budget_slightly_over() -> None:
     tracker = BudgetTracker()
     tracker.record(CostInfo(cost_usd=5.01, token_usage=TokenUsage()))
     budget = Budget(run=5.0)
-    assert tracker.check_budget(budget) == BudgetStatus.EXCEEDED
+    assert tracker.check_budget(budget).status == BudgetStatus.EXCEEDED
 
 
 def test_budget_with_no_thresholds() -> None:
@@ -503,7 +502,7 @@ def test_budget_tracker_check_budget_reserve_exceeded() -> None:
     tracker = BudgetTracker()
     tracker.record(CostInfo(cost_usd=5.0, token_usage=TokenUsage()))
     budget = Budget(run=10.0, reserve=5.0)  # effective = 5
-    assert tracker.check_budget(budget) == BudgetStatus.EXCEEDED
+    assert tracker.check_budget(budget).status == BudgetStatus.EXCEEDED
 
 
 def test_budget_tracker_check_budget_reserve_ok() -> None:
@@ -511,7 +510,7 @@ def test_budget_tracker_check_budget_reserve_ok() -> None:
     tracker = BudgetTracker()
     tracker.record(CostInfo(cost_usd=3.0, token_usage=TokenUsage()))
     budget = Budget(run=10.0, reserve=5.0)  # effective = 5
-    assert tracker.check_budget(budget) == BudgetStatus.OK
+    assert tracker.check_budget(budget).status == BudgetStatus.OK
 
 
 def test_budget_tracker_current_run_tokens() -> None:
@@ -546,7 +545,7 @@ def test_budget_tracker_check_budget_run_tokens_exceeded() -> None:
         tracker.check_budget(
             Budget(run=10.0),
             token_limits=TokenLimits(run=10000),
-        )
+        ).status
         == BudgetStatus.EXCEEDED
     )
 
@@ -564,7 +563,7 @@ def test_budget_tracker_check_budget_run_tokens_ok() -> None:
         tracker.check_budget(
             Budget(run=10.0),
             token_limits=TokenLimits(run=10000),
-        )
+        ).status
         == BudgetStatus.OK
     )
 
@@ -624,7 +623,7 @@ def test_budget_threshold_window_run_default() -> None:
 
 
 def test_budget_threshold_window_hour() -> None:
-    """Threshold with window=hour uses hourly cost vs per.hour."""
+    """BudgetThreshold with window=hour uses hourly cost vs per.hour."""
     from syrin.threshold import BudgetThreshold
 
     tracker = BudgetTracker()
@@ -640,7 +639,7 @@ def test_budget_threshold_window_hour() -> None:
 
 
 def test_budget_threshold_window_day() -> None:
-    """Threshold with window=day uses daily cost vs per.day."""
+    """BudgetThreshold with window=day uses daily cost vs per.day."""
     from syrin.threshold import BudgetThreshold
 
     tracker = BudgetTracker()
@@ -656,7 +655,7 @@ def test_budget_threshold_window_day() -> None:
 
 
 def test_budget_threshold_window_month_skipped_when_no_per() -> None:
-    """Threshold with window=month and no per.month does not trigger."""
+    """BudgetThreshold with window=month and no per.month does not trigger."""
     from syrin.threshold import BudgetThreshold
 
     tracker = BudgetTracker()
@@ -733,4 +732,4 @@ def test_budget_tracker_check_budget_no_token_limits_no_token_check() -> None:
             token_usage=TokenUsage(total_tokens=100_000),
         )
     )
-    assert tracker.check_budget(Budget(run=10.0)) == BudgetStatus.OK
+    assert tracker.check_budget(Budget(run=10.0)).status == BudgetStatus.OK

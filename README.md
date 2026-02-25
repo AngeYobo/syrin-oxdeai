@@ -164,12 +164,12 @@ Input/output validation with hooks and reporting:
 
 ```python
 from syrin import Agent, GuardrailChain
-from syrin.guardrails import LengthGuardrail, BlockedWordsGuardrail
+from syrin.guardrails import LengthGuardrail, ContentFilter
 
 class SafeAgent(Agent):
     guardrails = GuardrailChain([
         LengthGuardrail(max_length=4000),
-        BlockedWordsGuardrail(blocked=["spam", "malicious"])
+        ContentFilter(blocked_words=["spam", "malicious"])
     ])
 
 result = SafeAgent().response("Hello!")

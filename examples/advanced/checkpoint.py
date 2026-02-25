@@ -38,7 +38,7 @@ def example_basic_checkpoint() -> None:
     checkpointer = Checkpointer()
 
     class StatefulAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     StatefulAgent()
@@ -69,7 +69,7 @@ def example_checkpoint_with_agent() -> None:
     checkpointer = Checkpointer()
 
     class ResearchAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a research assistant."
 
     agent = ResearchAgent()
@@ -187,7 +187,7 @@ def example_checkpoint_resume_simulation() -> None:
     checkpointer = Checkpointer()
 
     class LongRunningAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant that provides detailed information."
 
     # Phase 1: Start task

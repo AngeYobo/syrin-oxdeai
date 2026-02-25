@@ -206,7 +206,7 @@ def example_sandbox_with_agent() -> None:
         return f"Error: {result.error}"
 
     class CodingAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a coding assistant. Use the execute_code tool to run Python code."
         tools = [execute_code]
 

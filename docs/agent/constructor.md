@@ -191,17 +191,17 @@ Key used to load/save budget in `budget_store`.
 
 Memory configuration: persistent config or conversation memory instance.
 
-**Type:** `ConversationMemory | MemoryConfig | None`  
-**Default:** Persistent memory with `MemoryConfig(types=[CORE, EPISODIC], top_k=10)`
+**Type:** `ConversationMemory | Memory | None`  
+**Default:** Persistent memory with `Memory(types=[CORE, EPISODIC], top_k=10)`
 
 ```python
-from syrin.memory.config import Memory as MemoryConfig
+from syrin.memory.config import Memory as Memory
 from syrin.enums import MemoryType
 
 # Persistent memory
 agent = Agent(
     model=model,
-    memory=MemoryConfig(
+    memory=Memory(
         types=[MemoryType.CORE, MemoryType.EPISODIC],
         top_k=10,
         auto_store=True,
@@ -209,7 +209,7 @@ agent = Agent(
 )
 
 # Or pass None to disable
-agent = Agent(model=model, memory=None)  # Uses default MemoryConfig
+agent = Agent(model=model, memory=None)  # Uses default Memory
 ```
 
 See [Memory](memory.md).
@@ -270,11 +270,11 @@ Input/output guardrails.
 **Default:** `[]` or class `guardrails` (merged on inheritance)
 
 ```python
-from syrin.guardrails import BlockedWordsGuardrail
+from syrin.guardrails import ContentFilter
 
 agent = Agent(
     model=model,
-    guardrails=[BlockedWordsGuardrail(["spam", "offensive"])],
+    guardrails=[ContentFilter(blocked_words=["spam", "offensive"])],
 )
 ```
 
@@ -382,7 +382,7 @@ from syrin.model import Model
 from syrin.tool import tool
 from syrin.checkpoint import CheckpointConfig
 from syrin.enums import CheckpointTrigger, LoopStrategy, MemoryType
-from syrin.memory.config import Memory as MemoryConfig
+from syrin.memory.config import Memory as Memory
 
 @tool
 def search(query: str) -> str:
@@ -395,7 +395,7 @@ agent = Agent(
     tools=[search],
     budget=Budget(run=0.50),
     max_tool_iterations=10,
-    memory=MemoryConfig(
+    memory=Memory(
         types=[MemoryType.CORE, MemoryType.EPISODIC],
         top_k=10,
     ),

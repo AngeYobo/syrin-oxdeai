@@ -3,6 +3,7 @@
 This shows what you get back from syrin.run() and agent.response().
 """
 
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -128,7 +129,9 @@ class MathResult:
 
 
 # Use the structured output by passing it to the Model
-model_with_output = syrin.Model.OpenAI("gpt-4o-mini", output=MathResult)
+model_with_output = syrin.Model.OpenAI(
+    "gpt-4o-mini", output=MathResult, api_key=os.getenv("OPENAI_API_KEY")
+)
 
 result_structured = syrin.run(
     "What is 15 + 27?",

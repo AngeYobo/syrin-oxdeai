@@ -87,7 +87,7 @@ def example_recall_with_query() -> None:
     print("=" * 50)
 
     class Assistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     assistant = Assistant(memory=Memory())
@@ -112,7 +112,7 @@ def example_forget_memory() -> None:
     print("=" * 50)
 
     class Assistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     assistant = Assistant(memory=Memory())
@@ -138,7 +138,7 @@ def example_memory_context_window() -> None:
     print("=" * 50)
 
     class Assistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
         persistent_memory = Memory()
 
@@ -181,7 +181,7 @@ def example_agent_memory_lifecycle() -> None:
     print("=" * 50)
 
     class Assistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant that remembers user context."
         persistent_memory = Memory()
 
@@ -208,7 +208,7 @@ def example_memory_importance() -> None:
     print("=" * 50)
 
     class Assistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
         persistent_memory = Memory()
 

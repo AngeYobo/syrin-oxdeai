@@ -50,7 +50,7 @@ class UserInfo:
 
 # Create agent with output validation
 agent = Agent(
-    model=Model.OpenAI(MODEL_ID),
+    model=Model.OpenAI(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
     output=Output(UserInfo, validation_retries=3),
 )
 
@@ -103,7 +103,7 @@ class ProductInfo:
 
 
 agent = Agent(
-    model=Model.OpenAI(MODEL_ID),
+    model=Model.OpenAI(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
     output=Output(ProductInfo, validation_retries=3),
     debug=True,
 )
@@ -165,7 +165,7 @@ class SentimentResult:
 
 
 agent = Agent(
-    model=Model.OpenAI(MODEL_ID),
+    model=Model.OpenAI(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
     output=Output(SentimentResult, validation_retries=3),
 )
 
@@ -276,7 +276,7 @@ class RatingValidator(OutputValidator):
 
 
 agent = Agent(
-    model=Model.OpenAI(MODEL_ID),
+    model=Model.OpenAI(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
     output=Output(
         type=ReviewResult,
         validator=RatingValidator(),
@@ -340,7 +340,7 @@ class RestrictedUser(BaseModel):
 
 
 agent = Agent(
-    model=Model.OpenAI(MODEL_ID),
+    model=Model.OpenAI(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
     output=Output(
         type=RestrictedUser,
         validation_retries=3,
@@ -393,7 +393,7 @@ API:
         email: str
 
     agent = Agent(
-        model=Model.OpenAI(MODEL_ID),
+        model=Model.OpenAI(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         output=Output(UserInfo, validation_retries=3),
     )
 

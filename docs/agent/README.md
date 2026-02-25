@@ -36,7 +36,7 @@ print(response.content)
 ### Capabilities
 
 - **[Tools](tools.md)** — Adding tools, tool execution, tool specs
-- **[Memory](memory.md)** — Persistent memory, `remember()`, `recall()`, `forget()`, MemoryConfig
+- **[Memory](memory.md)** — Persistent memory, `remember()`, `recall()`, `forget()`, Memory
 - **[Structured Output](structured-output.md)** — Output config, validation, Pydantic models
 
 ### Observability & Control

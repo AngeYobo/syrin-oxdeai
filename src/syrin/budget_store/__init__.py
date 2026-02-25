@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -130,6 +131,9 @@ class FileBudgetStore(BudgetStore):
                     f.seek(0)
                     f.truncate()
                     f.write(json.dumps(all_data, indent=2))
+                    f.flush()
+                    with contextlib.suppress(OSError):
+                        os.fsync(f.fileno())
                 finally:
                     _unlock_file(f)
         else:

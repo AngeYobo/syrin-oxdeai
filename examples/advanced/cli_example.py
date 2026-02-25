@@ -93,7 +93,7 @@ def example_cli_with_agent() -> None:
     print("=" * 50)
 
     class DemoAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = DemoAgent()
@@ -144,7 +144,7 @@ def example_cli_commands_simulation() -> None:
     CLI()
 
     class BudgetAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
         @property
@@ -173,11 +173,11 @@ def example_multi_agent_cli() -> None:
     print("=" * 50)
 
     class ResearchAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a research assistant."
 
     class ChatAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a friendly chat assistant."
 
     # You can switch between agents

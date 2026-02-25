@@ -86,7 +86,7 @@ def example_pipe_with_agent() -> None:
     print("=" * 50)
 
     class TransformAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = TransformAgent()

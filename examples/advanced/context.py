@@ -21,11 +21,11 @@ from dotenv import load_dotenv
 from syrin import Agent, Model
 from syrin.context import (
     Context,
-    ContextBudget,
     ContextCompactor,
     ContextManager,
     ContextPayload,
     MiddleOutTruncator,
+    TokenLimits,
 )
 from syrin.context.counter import TokenCounter
 from syrin.enums import Hook
@@ -46,7 +46,7 @@ def example_default_context() -> None:
     print("=" * 50)
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
     )
 
@@ -67,7 +67,7 @@ def example_custom_context() -> None:
     print("=" * 50)
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
         context=Context(max_tokens=80000),
     )
@@ -86,7 +86,7 @@ def example_context_stats() -> None:
     print("=" * 50)
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant that answers questions.",
         context=Context(max_tokens=128000),
     )
@@ -146,7 +146,7 @@ def example_custom_context_manager() -> None:
             system_prompt: str,
             tools: list[dict[str, Any]],
             memory_context: str,
-            budget: ContextBudget,
+            budget: TokenLimits,
         ) -> ContextPayload:
             counter = TokenCounter()
 
@@ -177,7 +177,7 @@ def example_custom_context_manager() -> None:
             print(f"Compaction happened: {event.method}")
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
         context=MyContextManager(),
     )
@@ -201,7 +201,7 @@ def example_context_with_events() -> None:
 
     # Create agent with debug mode for visibility
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
         context=Context(max_tokens=128000),
         debug=True,
@@ -232,7 +232,7 @@ def example_compaction_events() -> None:
 
     # Small budget to force compaction
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
         context=Context(max_tokens=5000),
     )
@@ -269,7 +269,7 @@ def example_context_thresholds() -> None:
         print(f"THRESHOLD: {ctx.percentage}%")
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
         context=Context(
             max_tokens=5000,
@@ -313,7 +313,7 @@ def example_custom_threshold_handler() -> None:
         print(f"CUSTOM HANDLER called: {ctx}")
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
         context=Context(
             max_tokens=5000,
@@ -345,7 +345,7 @@ def example_budget_detection() -> None:
     print("=" * 50)
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
     )
 

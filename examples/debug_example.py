@@ -38,7 +38,7 @@ def main():
     # Create agent with debug=True - that's it!
     # All events will be printed to console automatically
     agent = Agent(
-        model=Model.OpenAI("gpt-4o-mini"),
+        model=Model.OpenAI("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant with access to tools.",
         tools=[calculator, greet],
         debug=True,  # <-- Just add this!

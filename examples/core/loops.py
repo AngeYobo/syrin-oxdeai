@@ -24,7 +24,7 @@ from syrin.loop import (
 )
 
 MODEL_ID = os.getenv("OPENAI_MODEL_NAME", "openai/gpt-4o-mini")
-model = Model(MODEL_ID)
+model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
 
 
 def example_single_shot():

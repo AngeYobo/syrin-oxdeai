@@ -12,7 +12,7 @@ Syrin’s context system manages **token limits**, **on-demand compaction**, and
 - [Configuration](#configuration)
 - [ContextThreshold and ThresholdContext](#contextthreshold-and-thresholdcontext)
 - [Compaction](#compaction)
-- [ContextBudget (token caps)](#contextbudget-token-caps)
+- [TokenLimits (token caps)](#contextbudget-token-caps)
 - [Agent API](#agent-api)
 - [Events](#events)
 - [Token counting](#token-counting)
@@ -47,12 +47,12 @@ Syrin’s context system manages **token limits**, **on-demand compaction**, and
 | Goal | Use | Notes |
 |------|-----|--------|
 | Limit **cost** (USD) per run or per period | **Budget** | `Agent(budget=Budget(run=10.0, per=RateLimit(day=50)))` |
-| Limit **tokens** per run or per period | **Context.budget** (ContextBudget / TokenLimits) | Same field names as Budget: run, per, on_exceeded |
+| Limit **tokens** per run or per period | **Context.budget** (TokenLimits / TokenLimits) | Same field names as Budget: run, per, on_exceeded |
 | Set **context window** size and reserve | **Context** (max_tokens, reserve) | reserve = tokens reserved for model output |
-| React at utilization (e.g. compact at 75%) | **Context.thresholds** + **ContextThreshold** + **compact_if_available** | Action receives **ThresholdContext** or **ThresholdEvent**; call **evt.compact()** to compact |
+| React at utilization (e.g. compact at 75%) | **Context.thresholds** + **ContextThreshold** + **compact_if_available** | Action receives **ThresholdContext**; call **evt.compact()** to compact |
 | Per-call stats (tokens, utilization, compact_count) | **result.context_stats** or **agent.context_stats** | **result.context** = Context used for that call (overrides agent's when passed) |
 
-**Budget vs token caps:** **Budget** = cost limits in USD. **Context.budget** (ContextBudget) = token caps (run and/or per period). Same field names (run, per, on_exceeded) for consistency.
+**Budget vs token caps:** **Budget** = cost limits in USD. **Context.budget** (TokenLimits) = token caps (run and/or per period). Same field names (run, per, on_exceeded) for consistency.
 
 ---
 
@@ -96,9 +96,9 @@ result = agent.response("Long conversation...")
 
 - **Context window** – The maximum tokens allowed for the current request’s context. Set by **`Context.max_tokens`** or inferred from the model (or 128k).
 - **Context window budget** – Internal **ContextWindowBudget**: `available = max_tokens - reserve` (default reserve 2000, or model’s **default_reserve_tokens** when set). Utilization = used tokens / available, capped at 1.0 when at or over budget. You don’t construct this; it’s built from **Context** during prepare.
-- **Thresholds** – **ContextThreshold** instances: at a given utilization (e.g. `at=75` or `at_range=(70, 75)`), an **action** callable is run. The callable receives **ThresholdContext** (alias **ThresholdEvent**) with `percentage`, `current_value`, `limit_value`, and **`compact()`** (context only).
+- **Thresholds** – **ContextThreshold** instances: at a given utilization (e.g. `at=75` or `at_range=(70, 75)`), an **action** callable is run. The callable receives **ThresholdContext** with `percentage`, `current_value`, `limit_value`, and **`compact()`** (context only).
 - **Compaction** – Reducing message list size (e.g. middle-out truncation or summarization). Happens **only** when something calls **`ctx.compact()`** or **`agent.context.compact()`** during **prepare** (typically from a threshold action). There is no automatic compaction at a fixed percentage.
-- **ContextBudget** – Optional token caps on **Context** via **`Context.budget`**: **run** (max tokens per run), **per** (hour/day/week/month), **on_exceeded** (callback). Same field names as **Budget** (run, per, on_exceeded). Enforced by the budget tracker; separate from cost (Budget).
+- **TokenLimits** – Optional token caps on **Context** via **`Context.budget`**: **run** (max tokens per run), **per** (hour/day/week/month), **on_exceeded** (callback). Same field names as **Budget** (run, per, on_exceeded). Enforced by the budget tracker; separate from cost (Budget).
 
 ---
 
@@ -115,21 +115,21 @@ result = agent.response("Long conversation...")
 | **max_tokens** | Cap total context size so you don’t exceed the model’s window or your own limit. | Max tokens for the context window. If `None`, resolved from the model’s **context_window** or 128k. Must be **> 0** when set. | Set explicitly (e.g. `80000`) or leave `None` to use model/default. |
 | **reserve** | Leave room for the model’s reply; otherwise utilization is based on input only. | Tokens subtracted from **max_tokens** to get “available” for input. Default 2000. **≥ 0**. Can be overridden by the model’s **default_reserve_tokens**. | Set on **Context** or on the model via **Model(..., default_reserve_tokens=8000)**. |
 | **thresholds** | React when utilization hits a percentage (e.g. compact at 75%, raise at 100%). | List of **ContextThreshold** (at/at_range, action). Only context thresholds are allowed. | Add **ContextThreshold(at=75, action=lambda ctx: ctx.compact() if ctx.compact else None)**. |
-| **budget** | Cap token usage per run and/or per period (separate from USD Budget). | Optional **ContextBudget**: **run**, **per**, **on_exceeded**. Same names as **Budget**. | **Context(budget=ContextBudget(run=50_000, on_exceeded=raise_on_exceeded))** or with **per=TokenRateLimit(...)**. |
+| **budget** | Cap token usage per run and/or per period (separate from USD Budget). | Optional **TokenLimits**: **run**, **per**, **on_exceeded**. Same names as **Budget**. | **Context(budget=TokenLimits(run=50_000, on_exceeded=raise_on_exceeded))** or with **per=TokenRateLimit(...)**. |
 | **encoding** | Token counting must use the same encoding as the model (e.g. cl100k_base for OpenAI). | TokenCounter encoding string. Default **"cl100k_base"**. | Set if you use a model with a different tokenizer; the default context manager uses it. |
 | **compactor** | Use a custom compaction strategy (e.g. summarizer) instead of the default middle-out truncation. | Optional **ContextCompactorProtocol**: **compact(messages, budget) -> CompactionResult**. | **Context(compactor=MyCompactor())**; default manager calls it during prepare when compaction runs. |
 
 Example:
 
 ```python
-from syrin import Context, ContextBudget, TokenRateLimit
+from syrin import Context, TokenLimits, TokenRateLimit
 
 ctx = Context(
     max_tokens=80000,
     reserve=2000,
     encoding="cl100k_base",
     thresholds=[...],        # see ContextThreshold section
-    budget=ContextBudget(run=50_000, per=TokenRateLimit(hour=100_000)),
+    budget=TokenLimits(run=50_000, per=TokenRateLimit(hour=100_000)),
 )
 ```
 
@@ -256,17 +256,17 @@ ctx.parent.context.compact()
 
 ---
 
-## ContextBudget (token caps)
+## TokenLimits (token caps)
 
-**ContextBudget** is the token-cap configuration you set on **Context.budget**. It uses the same field names as **Budget** (USD): **run**, **per**, **on_exceeded**.
+**TokenLimits** is the token-cap configuration you set on **Context.budget**. It uses the same field names as **Budget** (USD): **run**, **per**, **on_exceeded**.
 
 **Why:** Cap token usage (input + output) per run and/or per time window without mixing with cost. Budget = USD only; token caps live on Context.
 
 **What:** Optional **run** (max tokens per request run), optional **per** (TokenRateLimit: hour/day/week/month), and **on_exceeded** (callback when a limit is hit). When set, the agent’s budget tracker enforces these after each LLM call.
 
-**How:** Pass **Context(budget=ContextBudget(run=..., per=..., on_exceeded=...))** to the agent. Use **raise_on_exceeded**, **warn_on_exceeded**, or a custom callable.
+**How:** Pass **Context(budget=TokenLimits(run=..., per=..., on_exceeded=...))** to the agent. Use **raise_on_exceeded**, **warn_on_exceeded**, or a custom callable.
 
-### ContextBudget fields
+### TokenLimits fields
 
 | Field           | Type | Description |
 |-----------------|------|-------------|
@@ -288,13 +288,13 @@ ctx.parent.context.compact()
 ### Example with output
 
 ```python
-from syrin import Agent, Context, ContextBudget, Model, TokenRateLimit
+from syrin import Agent, Context, TokenLimits, Model, TokenRateLimit
 from syrin.budget import raise_on_exceeded
 
 agent = Agent(
     model=Model("openai/gpt-4o"),
     context=Context(
-        budget=ContextBudget(
+        budget=TokenLimits(
             run=50_000,
             per=TokenRateLimit(hour=100_000, day=400_000),
             on_exceeded=raise_on_exceeded,
@@ -463,7 +463,7 @@ Example (keep only last N messages):
 
 ```python
 from typing import Any
-from syrin.context import ContextManager, ContextBudget, ContextPayload
+from syrin.context import ContextManager, ContextPayload, TokenLimits
 from syrin.context.counter import get_counter
 
 class RecentOnlyManager:
@@ -477,7 +477,7 @@ class RecentOnlyManager:
         system_prompt: str,
         tools: list[dict],
         memory_context: str,
-        budget: ContextBudget,
+        budget: ContextWindowBudget,
         context: Any = None,
     ) -> ContextPayload:
         recent = messages[-self._keep:] if len(messages) > self._keep else messages
@@ -532,8 +532,8 @@ You can replace the compactor in a custom manager or extend **DefaultContextMana
 
 ## Integration with memory and budget
 
-- **Memory:** Persistent memory (e.g. **MemoryConfig**, **Memory**) is recalled and formatted as **memory_context**. The default context manager injects it as a system message (**[Memory]\n...**) when **memory_context** is non-empty. So context stats and compaction apply to the full message list including memory.
-- **Budget:** Cost limits are **Budget** (USD). Token usage caps are **Context.budget** (**ContextBudget**). You can use both: **Agent(budget=Budget(...), context=Context(budget=ContextBudget(...)))**.
+- **Memory:** Persistent memory (**Memory**) is recalled and formatted as **memory_context**. The default context manager injects it as a system message (**[Memory]\n...**) when **memory_context** is non-empty. So context stats and compaction apply to the full message list including memory.
+- **Budget:** Cost limits are **Budget** (USD). Token usage caps are **Context.budget** (**TokenLimits**). You can use both: **Agent(budget=Budget(...), context=Context(budget=TokenLimits(...)))**.
 
 ---
 
@@ -543,11 +543,10 @@ You can replace the compactor in a custom manager or extend **DefaultContextMana
 |--------------|-------------|
 | **Context** | Config: max_tokens, reserve, thresholds, budget, encoding, compactor. **get_budget(model)**. |
 | **ContextStats** | total_tokens, max_tokens, utilization, compacted, compact_count (this run only), compact_method, thresholds_triggered. |
-| **ContextBudget** | Token caps: **run**, **per** (TokenRateLimit), **on_exceeded**. Use on **Context.budget**. |
-| **ContextWindowBudget** (alias **WindowCapacity**) | Internal: max_tokens, reserve, available, used_tokens, utilization, percent, reset(). |
+| **TokenLimits** | Token caps: **run**, **per** (TokenRateLimit), **on_exceeded**. Use on **Context.budget**. |
+| **ContextWindowBudget** | Internal: max_tokens, reserve, available, used_tokens, utilization, percent, reset(). |
 | **ContextThreshold** | at, at_range, action, metric=TOKENS, window=MAX_TOKENS. **should_trigger(percent, metric)**. |
-| **ThresholdContext** (alias **ThresholdEvent**) | percentage, metric, current_value, limit_value, budget_run, parent, metadata, **compact**. |
-| **TokenBudget** | Alias for ContextBudget (backward compat). Prefer **ContextBudget**. |
+| **ThresholdContext** | percentage, metric, current_value, limit_value, budget_run, parent, metadata, **compact**. |
 | **ContextPayload** | messages, system_prompt, tools, tokens. |
 | **ContextManager** | Protocol: prepare(), on_compact(). |
 | **DefaultContextManager** | context, prepare(), stats, current_tokens, **compact()**, set_emit_fn(), set_tracer(). |
@@ -561,7 +560,7 @@ You can replace the compactor in a custom manager or extend **DefaultContextMana
 | **ContextCompactorProtocol** | Protocol for custom compactors: **compact(messages, budget) -> CompactionResult**. Use for **Context.compactor** type. |
 | **create_context_manager(context, emit_fn, tracer)** | Build DefaultContextManager. |
 | **Response** (from agent) | **context_stats**, **context** – per-call context stats and effective Context for that run. |
-| **ContextBudget** | Token caps on Context: **run**, **per** (TokenRateLimit), **on_exceeded**. Same field names as Budget. |
+| **TokenLimits** | Token caps on Context: **run**, **per** (TokenRateLimit), **on_exceeded**. Same field names as Budget. |
 | **ContextWindowBudget** | Internal: max_tokens, reserve, available, used_tokens, utilization (used during prepare). |
 
 ---
@@ -735,17 +734,17 @@ agent.events.on("context.compact", lambda e: print("Compacted:", e["method"]))
 result = agent.response("A long message...")
 ```
 
-### With budget (ContextBudget)
+### With budget (TokenLimits)
 
 ```python
-from syrin import Agent, Context, ContextBudget, Model, TokenRateLimit
+from syrin import Agent, Context, TokenLimits, Model, TokenRateLimit
 from syrin.budget import warn_on_exceeded
 
 agent = Agent(
     model=Model("openai/gpt-4o"),
     context=Context(
         max_tokens=128000,
-        budget=ContextBudget(
+        budget=TokenLimits(
             run=30_000,
             per=TokenRateLimit(hour=100_000),
             on_exceeded=warn_on_exceeded,

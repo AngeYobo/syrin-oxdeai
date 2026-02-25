@@ -39,11 +39,11 @@ def example_prompt_decorator() -> None:
     print("=" * 50)
 
     class ScienceExpert(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = expert_prompt(domain="quantum physics", tone="academic")
 
     class BusinessExpert(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = expert_prompt(domain="business strategy", tone="practical")
 
     print("1. Created specialized experts from @prompt template:")

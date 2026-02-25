@@ -4,6 +4,7 @@ This demonstrates the simplest way to use Syrin - a single function call
 without needing to create an Agent instance.
 """
 
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -36,7 +37,7 @@ print(f"\n{result2.content}")
 # Using Model instance
 result3 = syrin.run(
     "What is 2+2?",
-    model=syrin.Model.OpenAI("gpt-4o"),
+    model=syrin.Model.OpenAI("gpt-4o", api_key=os.getenv("OPENAI_API_KEY")),
 )
 print(f"\n{result3.content}")
 

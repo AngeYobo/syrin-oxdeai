@@ -45,11 +45,11 @@ def example_team() -> None:
     print("=" * 50)
 
     class Researcher(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = researcher_prompt(domain="technology")
 
     class Writer(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = writer_prompt(style="engaging")
 
     team = AgentTeam(
@@ -74,11 +74,11 @@ def example_team_selection() -> None:
     print("=" * 50)
 
     class Researcher(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = researcher_prompt(domain="general")
 
     class Writer(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = writer_prompt(style="general")
 
     team = AgentTeam(agents=[Researcher(), Writer()])

@@ -34,7 +34,7 @@ def example_basic_memory() -> None:
     print("=" * 50)
 
     class Assistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant that remembers user preferences."
 
     assistant = Assistant(memory=Memory())
@@ -55,7 +55,7 @@ def example_memory_types() -> None:
     print("=" * 50)
 
     class Assistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     assistant = Assistant(memory=Memory())

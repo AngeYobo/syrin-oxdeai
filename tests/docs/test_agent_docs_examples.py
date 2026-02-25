@@ -58,7 +58,7 @@ def _create_mock_provider():
 class TestReadmeExamples:
     """Examples from docs/agent/README.md."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_quick_start(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(
@@ -77,7 +77,7 @@ class TestReadmeExamples:
 class TestRunningExamples:
     """Examples from docs/agent/running.md."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_response_sync(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"))
@@ -86,14 +86,14 @@ class TestRunningExamples:
         assert hasattr(response, "cost")
 
     @pytest.mark.asyncio
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     async def test_arun_async(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"))
         response = await agent.arun("What is the capital of France?")
         assert response.content
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_stream_sync(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"))
@@ -102,14 +102,14 @@ class TestRunningExamples:
         assert all(hasattr(c, "text") and hasattr(c, "accumulated_text") for c in chunks)
 
     @pytest.mark.asyncio
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     async def test_astream_async(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"))
         chunks = [c async for c in agent.astream("Write a short poem")]
         assert len(chunks) >= 1
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_stream_chunk_fields(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"))
@@ -163,11 +163,11 @@ class TestMemoryExamples:
 
     def test_memory_config_agent_construction(self):
         from syrin.enums import MemoryBackend
-        from syrin.memory.config import Memory as MemoryConfig
+        from syrin.memory import Memory
 
         agent = Agent(
             model=Model("openai/gpt-4o-mini"),
-            memory=MemoryConfig(
+            memory=Memory(
                 backend=MemoryBackend.MEMORY,
                 types=[MemoryType.CORE, MemoryType.EPISODIC],
                 top_k=10,
@@ -190,7 +190,7 @@ class TestMemoryExamples:
 class TestBudgetExamples:
     """Examples from docs/agent/budget.md."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_budget_basic_usage(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"), budget=Budget(run=1.0))
@@ -275,7 +275,7 @@ class TestToolsExamples:
         result = create_task.func(title="test", priority=2)
         assert "Created:" in result
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_execute_tool_custom_loop(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
 
@@ -360,17 +360,15 @@ class TestConstructorExamples:
         assert agent._budget_store_key == "user_123"
 
     def test_memory_config_constructor(self):
-        from syrin.memory.config import Memory as MemoryConfig
+        from syrin.memory import Memory
 
         agent = Agent(
             model=Model("openai/gpt-4o-mini"),
-            memory=MemoryConfig(
-                types=[MemoryType.CORE, MemoryType.EPISODIC], top_k=10, auto_store=True
-            ),
+            memory=Memory(types=[MemoryType.CORE, MemoryType.EPISODIC], top_k=10, auto_store=True),
         )
         assert agent.memory is not None
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_loop_strategy_constructor(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"), loop_strategy=LoopStrategy.SINGLE_SHOT)
@@ -384,11 +382,11 @@ class TestConstructorExamples:
         assert agent._loop is not None
 
     def test_guardrails_constructor(self):
-        from syrin.guardrails import BlockedWordsGuardrail
+        from syrin.guardrails import ContentFilter
 
         agent = Agent(
             model=Model("openai/gpt-4o-mini"),
-            guardrails=[BlockedWordsGuardrail(["spam", "offensive"])],
+            guardrails=[ContentFilter(blocked_words=["spam", "offensive"])],
         )
         assert agent._guardrails is not None
 
@@ -424,7 +422,7 @@ class TestConstructorExamples:
         agent = Agent(model=Model("openai/gpt-4o-mini"), debug=True)
         assert agent._debug is True
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_complete_example(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
 
@@ -459,7 +457,7 @@ class TestConstructorExamples:
 class TestCreatingAgentsExamples:
     """Examples from docs/agent/creating-agents.md."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_instance_based(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(
@@ -469,7 +467,7 @@ class TestCreatingAgentsExamples:
         response = agent.response("Hello")
         assert response.content
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_class_based(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
 
@@ -556,7 +554,7 @@ class TestOverviewExamples:
         model = Model("openai/gpt-4o-mini")
         assert model is not None
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_minimum_agent(self, mock_get_provider):
         mock_get_provider.return_value = _mock_provider_response(content="4")
         mock = MagicMock()
@@ -573,7 +571,7 @@ class TestOverviewExamples:
         response = agent.response("What is 2+2?")
         assert response.content
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_full_featured_agent(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
 
@@ -608,7 +606,7 @@ class TestOverviewExamples:
 class TestResponseExamples:
     """Examples from docs/agent/response.md."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_response_fields(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"))
@@ -618,14 +616,14 @@ class TestResponseExamples:
         assert hasattr(response, "tokens")
         assert hasattr(response, "model")
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_str_response(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"))
         response = agent.response("Hello")
         assert str(response) == response.content
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_bool_response(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"))
@@ -694,11 +692,11 @@ class TestGuardrailsExamples:
     """Examples from docs/agent/guardrails.md."""
 
     def test_blocked_words_guardrail(self):
-        from syrin.guardrails import BlockedWordsGuardrail
+        from syrin.guardrails import ContentFilter
 
         agent = Agent(
             model=Model("openai/gpt-4o-mini"),
-            guardrails=[BlockedWordsGuardrail(["spam", "offensive"])],
+            guardrails=[ContentFilter(blocked_words=["spam", "offensive"])],
         )
         assert agent._guardrails is not None
 
@@ -748,7 +746,7 @@ class TestCheckpointingExamples:
 class TestEventsHooksExamples:
     """Examples from docs/agent/events-hooks.md."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_register_handlers(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"))
@@ -784,7 +782,7 @@ class TestEventsHooksExamples:
 class TestHandoffSpawnExamples:
     """Examples from docs/agent/handoff-spawn.md."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_handoff(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
 
@@ -800,7 +798,7 @@ class TestHandoffSpawnExamples:
         response = researcher.handoff(Writer, "Write an article based on your research")
         assert response.content
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_spawn_with_task(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
 
@@ -814,7 +812,7 @@ class TestHandoffSpawnExamples:
         result = parent.spawn(Child, task="Research topic X", budget=Budget(run=0.10))
         assert result.content
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_spawn_parallel(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
 
@@ -853,7 +851,7 @@ class TestHandoffSpawnExamples:
 class TestMultiAgentPatternsExamples:
     """Examples from docs/agent/multi-agent-patterns.md."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_pipeline_sequential(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
 
@@ -874,7 +872,7 @@ class TestMultiAgentPatternsExamples:
         ).sequential()
         assert result.content
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_pipeline_parallel(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
 
@@ -892,7 +890,7 @@ class TestMultiAgentPatternsExamples:
         assert len(results) == 2
 
     @pytest.mark.asyncio
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     async def test_parallel_helper(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent1 = Agent(model=Model("openai/gpt-4o-mini"))
@@ -905,7 +903,7 @@ class TestMultiAgentPatternsExamples:
         )
         assert len(results) == 2
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_sequential_helper(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent1 = Agent(model=Model("openai/gpt-4o-mini"))
@@ -930,7 +928,7 @@ class TestModelExamples:
         agent.switch_model(Model("openai/gpt-4o"))
         assert agent._model_config is not None
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_response_model_field(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
         agent = Agent(model=Model("openai/gpt-4o-mini"))

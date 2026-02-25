@@ -10,34 +10,15 @@ Run: python -m examples.guardrails.reports
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 from syrin import Agent, Guardrail, GuardrailStage, Hook, Model
+from syrin.guardrails import ContentFilter
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
-
-class BlockedWordsGuardrail(Guardrail):
-    """Simple guardrail that blocks specific words."""
-
-    def __init__(self, blocked_words: list[str]):
-        self.blocked_words = [w.lower() for w in blocked_words]
-        self.name = "blocked_words"
-
-    async def evaluate(self, context):
-        from syrin.guardrails.decision import GuardrailDecision
-
-        text = context.text.lower()
-        for word in self.blocked_words:
-            if word in text:
-                return GuardrailDecision(
-                    passed=False,
-                    action="block",
-                    reason=f"Blocked word found: {word}",
-                )
-        return GuardrailDecision(passed=True, action="allow", reason="Clean")
 
 
 def example_guardrail_blocked():
@@ -46,10 +27,10 @@ def example_guardrail_blocked():
     print("Example: Guardrail Blocks Input")
     print("=" * 60)
 
-    guardrail = BlockedWordsGuardrail(["hack", "steal", "password"])
+    guardrail = ContentFilter(blocked_words=["hack", "steal", "password"])
 
     class Assistant(Agent):
-        model = Model("openai/gpt-4o-mini")
+        model = Model("openai/gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
         guardrails = [guardrail]
         debug = True
@@ -86,10 +67,10 @@ def example_guardrail_passed():
     print("Example: Guardrail Passes")
     print("=" * 60)
 
-    guardrail = BlockedWordsGuardrail(["hack", "steal", "password"])
+    guardrail = ContentFilter(blocked_words=["hack", "steal", "password"])
 
     class Assistant(Agent):
-        model = Model("openai/gpt-4o-mini")
+        model = Model("openai/gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
         guardrails = [guardrail]
 
@@ -145,7 +126,7 @@ def example_output_guardrail():
     guardrail = SensitiveDataGuardrail()
 
     class Assistant(Agent):
-        model = Model("openai/gpt-4o-mini")
+        model = Model("openai/gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
         guardrails = [guardrail]
 
@@ -174,10 +155,10 @@ def example_report_summary():
     print("Example: Full Report Summary")
     print("=" * 60)
 
-    guardrail = BlockedWordsGuardrail(["hack"])
+    guardrail = ContentFilter(blocked_words=["hack"])
 
     class Assistant(Agent):
-        model = Model("openai/gpt-4o-mini")
+        model = Model("openai/gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
         guardrails = [guardrail]
 

@@ -18,7 +18,7 @@ pip install redis
 ```python
 from Syrin import Agent, Model
 from Syrin.ratelimit import APIRateLimit
-from Syrin.enums import RateLimitAction, RateLimitMetric
+from Syrin.enums import RateLimitAction, ThresholdMetric
 from Syrin.ratelimit import RateLimitThreshold
 
 # Auto-detect limits (recommended)
@@ -34,8 +34,8 @@ agent = Agent(
         rpm=500,
         tpm=150000,
         thresholds=[
-            RateLimitThreshold(at=80, metric=RateLimitMetric.RPM, action=RateLimitAction.WARN),
-            RateLimitThreshold(at=100, metric=RateLimitMetric.RPM, action=RateLimitAction.SWITCH_MODEL, switch_to_model="gpt-4o-mini"),
+            RateLimitThreshold(at=80, metric=ThresholdMetric.RPM, action=RateLimitAction.WARN),
+            RateLimitThreshold(at=100, metric=ThresholdMetric.RPM, action=RateLimitAction.SWITCH_MODEL, switch_to_model="gpt-4o-mini"),
         ]
     )
 )
@@ -105,7 +105,7 @@ Define actions at specific usage percentages:
 
 ```python
 from Syrin.ratelimit import APIRateLimit, RateLimitThreshold
-from Syrin.enums import RateLimitAction, RateLimitMetric
+from Syrin.enums import RateLimitAction, ThresholdMetric
 
 rate_limit = APIRateLimit(
     rpm=500,
@@ -113,14 +113,14 @@ rate_limit = APIRateLimit(
         # At 50% - warn developers
         RateLimitThreshold(
             at=50,
-            metric=RateLimitMetric.RPM,
+            metric=ThresholdMetric.RPM,
             action=RateLimitAction.WARN,
         ),
         
         # At 80% - wait before next request
         RateLimitThreshold(
             at=80,
-            metric=RateLimitMetric.RPM,
+            metric=ThresholdMetric.RPM,
             action=RateLimitAction.WAIT,
             wait_seconds=2.0,
         ),
@@ -128,7 +128,7 @@ rate_limit = APIRateLimit(
         # At 100% - switch to cheaper model
         RateLimitThreshold(
             at=100,
-            metric=RateLimitMetric.RPM,
+            metric=ThresholdMetric.RPM,
             action=RateLimitAction.SWITCH_MODEL,
             switch_to_model="gpt-4o-mini",
         ),
@@ -161,7 +161,7 @@ rate_limit = APIRateLimit(
     thresholds=[
         RateLimitThreshold(
             at=80,
-            metric=RateLimitMetric.RPM,
+            metric=ThresholdMetric.RPM,
             action=RateLimitAction.CUSTOM,
             handler=my_handler,
         ),
@@ -171,7 +171,7 @@ rate_limit = APIRateLimit(
 
 ---
 
-## RateLimitMetric Options
+## ThresholdMetric Options
 
 | Metric | Description |
 |--------|-------------|
@@ -205,11 +205,11 @@ rate_limit = APIRateLimit(
 
 ```python
 from Syrin.ratelimit import RateLimitThreshold
-from Syrin.enums import RateLimitAction, RateLimitMetric
+from Syrin.enums import RateLimitAction, ThresholdMetric
 
 threshold = RateLimitThreshold(
     at=80,                           # Percentage (0-100)
-    metric=RateLimitMetric.RPM,      # Which metric to monitor
+    metric=ThresholdMetric.RPM,      # Which metric to monitor
     action=RateLimitAction.WARN,      # What to do
     handler=None,                     # For CUSTOM action
     switch_to_model=None,             # For SWITCH_MODEL action
@@ -265,14 +265,14 @@ Emitted when a threshold is crossed:
 ```python
 from Syrin import Agent, Model
 from Syrin.ratelimit import APIRateLimit, RateLimitThreshold
-from Syrin.enums import RateLimitAction, RateLimitMetric
+from Syrin.enums import RateLimitAction, ThresholdMetric
 
 agent = Agent(
     model=Model("openai/gpt-4o"),
     rate_limit=APIRateLimit(
         rpm=100,
         thresholds=[
-            RateLimitThreshold(at=80, metric=RateLimitMetric.RPM, action=RateLimitAction.WARN),
+            RateLimitThreshold(at=80, metric=ThresholdMetric.RPM, action=RateLimitAction.WARN),
         ],
     ),
 )
@@ -469,7 +469,7 @@ agent = Agent(
 ```python
 from Syrin import Agent, Model
 from Syrin.ratelimit import APIRateLimit, RateLimitThreshold
-from Syrin.enums import RateLimitAction, RateLimitMetric
+from Syrin.enums import RateLimitAction, ThresholdMetric
 
 # Create agent with full rate limit configuration
 agent = Agent(
@@ -479,9 +479,9 @@ agent = Agent(
         tpm=150000,
         rpd=10000,
         thresholds=[
-            RateLimitThreshold(at=50, metric=RateLimitMetric.RPM, action=RateLimitAction.WARN),
-            RateLimitThreshold(at=80, metric=RateLimitMetric.RPM, action=RateLimitAction.WAIT, wait_seconds=2.0),
-            RateLimitThreshold(at=100, metric=RateLimitMetric.RPM, action=RateLimitAction.SWITCH_MODEL, switch_to_model="openai/gpt-4o-mini"),
+            RateLimitThreshold(at=50, metric=ThresholdMetric.RPM, action=RateLimitAction.WARN),
+            RateLimitThreshold(at=80, metric=ThresholdMetric.RPM, action=RateLimitAction.WAIT, wait_seconds=2.0),
+            RateLimitThreshold(at=100, metric=ThresholdMetric.RPM, action=RateLimitAction.SWITCH_MODEL, switch_to_model="openai/gpt-4o-mini"),
         ],
         retry_on_429=True,
         max_retries=3,

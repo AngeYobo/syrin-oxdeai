@@ -35,7 +35,7 @@ def example_stream() -> None:
     print("=" * 50)
 
     class StreamAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = StreamAgent()
@@ -57,7 +57,7 @@ def example_stream_chunk() -> None:
     print("=" * 50)
 
     class StreamAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = StreamAgent()
@@ -79,7 +79,7 @@ async def example_astream() -> None:
     print("=" * 50)
 
     class AsyncStreamAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = AsyncStreamAgent()
@@ -101,7 +101,7 @@ async def example_astream_with_metrics() -> None:
     print("=" * 50)
 
     class MetricsAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = MetricsAgent()
@@ -124,7 +124,7 @@ def example_stream_collect() -> None:
     print("=" * 50)
 
     class CollectAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = CollectAgent()
@@ -146,7 +146,7 @@ async def example_stream_processing() -> None:
     print("=" * 50)
 
     class ProcessingAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = ProcessingAgent()
@@ -173,7 +173,7 @@ def example_stream_with_tools() -> None:
         return str(a + b)
 
     class ToolStreamAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "Use the calculator tool."
         tools = [calculate]
 

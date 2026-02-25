@@ -69,7 +69,7 @@ These have **both** standalone and agent-integrated usage:
 |-----------|------------|-------------------|
 | **Budget** | `BudgetStore` get/save | Agent `budget=` param, `budget_summary` |
 | **Guardrails** | `GuardrailChain.evaluate()` | Agent `guardrails=` param |
-| **Memory (persistent)** | Backends, `MemoryConfig` | Agent `remember()`, `recall()`, `forget()` |
+| **Memory (persistent)** | Backends, `Memory` | Agent `remember()`, `recall()`, `forget()` |
 | **Rate limit** | `APIRateLimit` config, backends | Agent `rate_limit=` param |
 | **Structured output** | Model `output=` | Agent `output=` param |
 | **Context** | Token counting, compaction | Agent `context=` param |

@@ -70,7 +70,11 @@ class TechResearchAgent(Agent):
     """Research agent for technology sector."""
 
     _syrin_name = "tech_researcher"
-    model = Model(provider="openai", model_id="gpt-4o-mini")
+    model = Model(
+        provider="openai",
+        model_id="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
     system_prompt = (
         "You research technology trends, innovations, and companies. Be thorough and data-driven."
     )
@@ -81,7 +85,11 @@ class FinanceResearchAgent(Agent):
     """Research agent for financial markets."""
 
     _syrin_name = "finance_researcher"
-    model = Model(provider="openai", model_id="gpt-4o-mini")
+    model = Model(
+        provider="openai",
+        model_id="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
     system_prompt = "You research financial markets, stocks, and investment trends. Provide data-backed insights."
     tools = [fetch_financial, analyze_data]
 
@@ -90,7 +98,11 @@ class HealthcareResearchAgent(Agent):
     """Research agent for healthcare industry."""
 
     _syrin_name = "healthcare_researcher"
-    model = Model(provider="openai", model_id="gpt-4o-mini")
+    model = Model(
+        provider="openai",
+        model_id="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
     system_prompt = "You research healthcare industry trends, pharma, biotech, and medical devices."
     tools = [search_web, analyze_data]
 
@@ -99,7 +111,11 @@ class EnergyResearchAgent(Agent):
     """Research agent for energy sector."""
 
     _syrin_name = "energy_researcher"
-    model = Model(provider="openai", model_id="gpt-4o-mini")
+    model = Model(
+        provider="openai",
+        model_id="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
     system_prompt = "You research energy markets, renewables, and sustainability trends."
     tools = [search_web, fetch_financial]
 
@@ -108,7 +124,11 @@ class ConsumerResearchAgent(Agent):
     """Research agent for consumer behavior."""
 
     _syrin_name = "consumer_researcher"
-    model = Model(provider="openai", model_id="gpt-4o-mini")
+    model = Model(
+        provider="openai",
+        model_id="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
     system_prompt = "You research consumer behavior, retail trends, and market preferences."
     tools = [search_web, analyze_data]
 
@@ -117,7 +137,11 @@ class AIResearchAgent(Agent):
     """Research agent for AI/ML sector."""
 
     _syrin_name = "ai_researcher"
-    model = Model(provider="openai", model_id="gpt-4o-mini")
+    model = Model(
+        provider="openai",
+        model_id="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
     system_prompt = "You research artificial intelligence, machine learning, and automation trends."
     tools = [search_web, analyze_data, generate_chart]
 
@@ -126,7 +150,11 @@ class GeopoliticsResearchAgent(Agent):
     """Research agent for geopolitical factors."""
 
     _syrin_name = "geopolitics_researcher"
-    model = Model(provider="openai", model_id="gpt-4o-mini")
+    model = Model(
+        provider="openai",
+        model_id="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
     system_prompt = "You research geopolitical factors affecting markets and business."
     tools = [search_web]
 
@@ -135,7 +163,11 @@ class RegulatoryResearchAgent(Agent):
     """Research agent for regulatory landscape."""
 
     _syrin_name = "regulatory_researcher"
-    model = Model(provider="openai", model_id="gpt-4o-mini")
+    model = Model(
+        provider="openai",
+        model_id="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
     system_prompt = "You research regulations, compliance, and policy changes affecting industries."
     tools = [search_web, export_report]
 
@@ -144,7 +176,11 @@ class CompetitorAnalysisAgent(Agent):
     """Research agent for competitive analysis."""
 
     _syrin_name = "competitor_researcher"
-    model = Model(provider="openai", model_id="gpt-4o-mini")
+    model = Model(
+        provider="openai",
+        model_id="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
     system_prompt = "You analyze competitors, market positioning, and business strategies."
     tools = [search_web, fetch_financial, analyze_data]
 
@@ -153,7 +189,11 @@ class SummarizerAgent(Agent):
     """Agent that synthesizes all research into a coherent report."""
 
     _syrin_name = "summarizer"
-    model = Model(provider="openai", model_id="gpt-4o-mini")
+    model = Model(
+        provider="openai",
+        model_id="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
     system_prompt = "You synthesize multiple research findings into a comprehensive, clear report."
     tools = [generate_chart, export_report]
 
@@ -259,7 +299,11 @@ class PipelineDebugger:
 def create_debug_pipeline():
     """Create pipeline with full debugging hooks."""
 
-    orchestrator_model = Model(provider="openai", model_id="gpt-4o-mini")
+    orchestrator_model = Model(
+            provider="openai",
+            model_id="gpt-4o-mini",
+            api_key=os.getenv("OPENAI_API_KEY"),
+        )
 
     all_agents = [
         TechResearchAgent,

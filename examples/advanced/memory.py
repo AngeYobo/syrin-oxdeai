@@ -192,7 +192,7 @@ def example_agent_memory():
 
     # Create agent with persistent memory
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         memory=Memory(
             types=[
                 MemoryType.CORE,

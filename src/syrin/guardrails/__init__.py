@@ -13,6 +13,7 @@ from syrin.guardrails.built_in import (
     CapabilityGuardrail,
     ContentFilter,
     HumanApproval,
+    LengthGuardrail,
     PIIScanner,
     ThresholdApproval,
 )
@@ -31,13 +32,10 @@ from syrin.guardrails.intelligence import (
     FuzzingEngine,
     RedTeamEvaluator,
 )
+from syrin.guardrails.result import GuardrailCheckResult
 
-# Keep old guardrails for backward compatibility
-from syrin.guardrails.legacy import (
-    BlockedWordsGuardrail,
-    GuardrailResult,
-    LengthGuardrail,
-)
+# Public API: GuardrailResult = GuardrailCheckResult
+GuardrailResult = GuardrailCheckResult
 
 __all__ = [
     # Core classes
@@ -69,8 +67,7 @@ __all__ = [
     "AttackSimulator",
     "RedTeamEvaluator",
     "FuzzingEngine",
-    # Legacy (backward compatibility)
-    "BlockedWordsGuardrail",
     "LengthGuardrail",
     "GuardrailResult",
+    "GuardrailCheckResult",
 ]

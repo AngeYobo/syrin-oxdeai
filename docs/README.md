@@ -56,6 +56,10 @@ Learn by doing! Pick a use case that matches what you want to build:
 - Custom models via inheritance
 - Tweakable properties, fallbacks, structured output
 
+**[Concept Map](concept-map.md)** — Budget vs TokenLimits vs Memory (quick reference)
+
+**[Extension Points](extension-points.md)** — How to implement Model, Provider, Loop, Guardrail, etc.
+
 **[Feature Reference Guide](reference.md)** - Complete API reference
 - All components
 - Common patterns
@@ -64,6 +68,7 @@ Learn by doing! Pick a use case that matches what you want to build:
 
 **[Advanced Topics](advanced-topics.md)** - Deep dives into production features
 - Lifecycle hooks
+- [Event Bus](event-bus.md) — Typed domain events for metrics and observability
 - Observability & tracing
 - Checkpointing & state persistence
 - Guardrails
@@ -156,6 +161,12 @@ Trace and debug agent execution with spans and sessions.
 - **Agent-only** — [Agent docs](agent/README.md), loops, hooks, handoff, checkpoint API
 - **Standalone** — [Models](models.md), [Guardrails](guardrails.md), [Observability](observability.md), [BudgetStore](budget-control.md)
 - **Shared** — Budget, Memory, Guardrails, Checkpoint, Structured output, Rate limit (see [ARCHITECTURE](ARCHITECTURE.md) for doc mapping)
+
+## 📋 Recent Changes
+
+**[Changelog & Breaking Changes](CHANGES.md)** — Removed aliases (ContextBudget, BlockedWordsGuardrail, MemoryConfig, etc.), migration guide, and bug fixes.
+
+---
 
 ## 🆘 Help & Support
 

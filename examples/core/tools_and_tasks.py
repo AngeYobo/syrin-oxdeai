@@ -93,7 +93,7 @@ def example_tools() -> None:
     print("=" * 50)
 
     class MathAssistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant that uses tools when needed."
         tools = [calculate, get_weather]
 
@@ -122,7 +122,7 @@ def example_tools_with_events() -> None:
     print("=" * 50)
 
     class MathAssistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant. Use tools for calculations."
         tools = [calculate]
         loop = ReactLoop(max_iterations=3)
@@ -163,7 +163,7 @@ def example_human_in_the_loop() -> None:
         return True
 
     class SafeAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a safe agent. Use calculate tool for math."
         tools = [calculate]
         loop = HumanInTheLoop(approve=approve_tool, max_iterations=3)
@@ -216,7 +216,7 @@ def example_multiple_tools() -> None:
     print("=" * 50)
 
     class ResearchAssistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a research assistant. Use tools to help answer questions."
         tools = [calculate, get_weather, search_documents]
 

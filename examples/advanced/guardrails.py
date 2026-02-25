@@ -1,7 +1,7 @@
 """Guardrails Example.
 
 Demonstrates:
-- Using BlockedWordsGuardrail to filter inappropriate content
+- Using ContentFilter to filter inappropriate content
 - Using LengthGuardrail to enforce text length limits
 - Creating custom guardrails
 - Using GuardrailChain to combine multiple guardrails
@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 from syrin import Agent, Model
 from syrin.enums import GuardrailStage
 from syrin.guardrails import (
-    BlockedWordsGuardrail,
+    ContentFilter,
     Guardrail,
     GuardrailChain,
     GuardrailContext,
@@ -37,12 +37,14 @@ MODEL_ID = os.getenv("OPENAI_MODEL_NAME", "openai/gpt-4o-mini")
 
 
 def example_blocked_words() -> None:
-    """Using BlockedWordsGuardrail to filter inappropriate content."""
+    """Using ContentFilter to filter inappropriate content."""
     print("\n" + "=" * 50)
     print("Blocked Words Guardrail")
     print("=" * 50)
 
-    blocked = BlockedWordsGuardrail(blocked_words=["spam", "scam", "phishing"], name="NoSpam")
+    blocked = GuardrailChain(
+        [ContentFilter(blocked_words=["spam", "scam", "phishing"], name="NoSpam")]
+    )
 
     # Test with clean text
     result = blocked.check("Hello, this is a legitimate message", GuardrailStage.INPUT)
@@ -59,7 +61,9 @@ def example_length_guardrail() -> None:
     print("Length Guardrail")
     print("=" * 50)
 
-    length_guard = LengthGuardrail(min_length=10, max_length=100, name="LengthCheck")
+    length_guard = GuardrailChain(
+        [LengthGuardrail(min_length=10, max_length=100, name="LengthCheck")]
+    )
 
     # Test with too short text
     result = length_guard.check("Hi", GuardrailStage.INPUT)
@@ -82,7 +86,7 @@ def example_guardrail_chain() -> None:
 
     chain = GuardrailChain(
         [
-            BlockedWordsGuardrail(["badword", "inappropriate"]),
+            ContentFilter(blocked_words=["badword", "inappropriate"]),
             LengthGuardrail(min_length=5, max_length=500),
         ]
     )
@@ -151,13 +155,13 @@ def example_guardrail_with_agent() -> None:
     # Create guardrail chain
     guardrails = GuardrailChain(
         [
-            BlockedWordsGuardrail(["forbidden", "blocked"]),
+            ContentFilter(blocked_words=["forbidden", "blocked"]),
             LengthGuardrail(min_length=1, max_length=1000),
         ]
     )
 
     class SafeAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = SafeAgent()
@@ -187,10 +191,12 @@ def example_output_guardrail() -> None:
     print("=" * 50)
 
     # Guardrail to check output length
-    output_guard = LengthGuardrail(min_length=10, max_length=200, name="OutputLength")
+    output_guard = GuardrailChain(
+        [LengthGuardrail(min_length=10, max_length=200, name="OutputLength")]
+    )
 
     class ControlledAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "Give very brief answers."
 
     agent = ControlledAgent()

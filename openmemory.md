@@ -53,3 +53,7 @@
 - Examples: `examples/` for minimal usage; `examples/models/models.py` centralizes model definitions for import
 - Lint/format: `ruff check . && ruff format .`; typecheck: `mypy src/syrin`
 - No version pinning when adding deps — use latest; pyproject lists minimums (e.g. pydantic>=2.0)
+
+## Architecture
+
+- **plan/ARCHITECTURE_IMPROVEMENT.md** — Design patterns in use, SOLID/DDD assessment, component relations, improvement plan (run context for Loops, Agent decomposition, provider resolution, bounded contexts, DX). Phases 1–3 done: AgentRunContext; _context_builder.build_messages(); providers.registry.get_provider() + Model.get_provider(); Agent uses _resolve_provider(model, model_config).

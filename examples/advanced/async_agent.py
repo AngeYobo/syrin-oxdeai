@@ -34,7 +34,7 @@ def example_sync_response() -> None:
     print("=" * 50)
 
     class Assistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     assistant = Assistant()
@@ -52,7 +52,7 @@ async def example_async_response() -> None:
     print("=" * 50)
 
     class Assistant(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     assistant = Assistant()
@@ -70,7 +70,7 @@ async def example_multiple_async() -> None:
     print("=" * 50)
 
     class Analyzer(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are an analyst."
 
     async def analyze(topic: str) -> None:

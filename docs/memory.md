@@ -321,7 +321,7 @@ from Syrin.enums import MemoryType
 # Create agent with persistent memory
 agent = Agent(
     model=Model("openai/gpt-4o-mini"),
-    memory=Memory(  # Accepts MemoryConfig or ConversationMemory
+    memory=Memory(  # Accepts Memory or ConversationMemory
         types=[MemoryType.CORE, MemoryType.EPISODIC],
         top_k=10,
     ),

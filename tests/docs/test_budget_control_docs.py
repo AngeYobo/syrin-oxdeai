@@ -44,7 +44,7 @@ def _create_mock_provider():
 class TestBudgetControlCompleteExample:
     """Complete Example from budget-control.md (BudgetAwareAgent with ThresholdWindow)."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_budget_aware_agent_with_thresholds(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
 
@@ -73,7 +73,7 @@ class TestBudgetControlCompleteExample:
 class TestBudgetControlSpendThresholdExample:
     """Spend-only thresholds (run + daily) from budget-control.md."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_spend_threshold_agent_construction(self, mock_get_provider):
         mock_get_provider.return_value = _create_mock_provider()
 

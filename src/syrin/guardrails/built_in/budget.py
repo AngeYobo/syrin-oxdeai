@@ -146,7 +146,7 @@ class BudgetEnforcer(Guardrail):
 
         # Check warning threshold
         if self.warn_threshold is not None:
-            limit_raw = getattr(budget, "limit", None) or getattr(budget, "run", remaining)
+            limit_raw = getattr(budget, "run", remaining)
             warn_limit: float = remaining if limit_raw is None else float(limit_raw)
             if warn_limit > 0:
                 ratio = remaining / warn_limit

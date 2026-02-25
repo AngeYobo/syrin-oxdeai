@@ -18,6 +18,7 @@ Example:
     >>> print(agent.context.stats)
 """
 
+from syrin.budget import TokenLimits
 from syrin.context._manager import (
     ContextManager,
     ContextPayload,
@@ -34,24 +35,20 @@ from syrin.context.compactors import (
 )
 from syrin.context.config import (
     Context,
-    ContextBudget,
     ContextStats,
     ContextWindowBudget,
-    TokenBudget,
-    WindowCapacity,
 )
 from syrin.context.counter import TokenCount, TokenCounter, get_counter
-from syrin.threshold import Threshold
+from syrin.threshold import BudgetThreshold, ContextThreshold
 
 __all__ = [
     # Config
     "Context",
     "ContextStats",
-    "ContextBudget",
     "ContextWindowBudget",
-    "WindowCapacity",
-    "TokenBudget",
-    "Threshold",
+    "TokenLimits",
+    "BudgetThreshold",
+    "ContextThreshold",
     # Counter
     "TokenCounter",
     "TokenCount",

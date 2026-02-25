@@ -75,13 +75,14 @@ def test_file_store_concurrent_save_single_file() -> None:
         t1.join()
         t2.join()
         assert not errors, errors
-        # Retry loads briefly; concurrent writes can delay visibility on some platforms.
-        for _ in range(5):
+        # Retry loads; concurrent writes can delay visibility on some platforms (NFS, CI).
+        la, lb = None, None
+        for _ in range(30):
             la = store.load("a")
             lb = store.load("b")
             if la is not None and lb is not None:
                 break
-            time.sleep(0.05)
+            time.sleep(0.1)
         assert la is not None, "load('a') failed after retries"
         assert lb is not None, "load('b') failed after retries"
         assert la.current_run_cost == 1.0

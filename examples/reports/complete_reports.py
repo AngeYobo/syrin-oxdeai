@@ -14,6 +14,7 @@ Run: python -m examples.reports.complete_reports
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -21,29 +22,9 @@ from pydantic import BaseModel
 
 from syrin import Agent, Budget, Hook, Model
 from syrin.enums import MemoryType
-from syrin.guardrails import Guardrail
-from syrin.guardrails.decision import GuardrailDecision
+from syrin.guardrails import ContentFilter
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
-
-class ContentBlockerGuardrail(Guardrail):
-    """Example guardrail that blocks harmful content."""
-
-    def __init__(self, blocked_words: list[str]):
-        self.blocked_words = blocked_words
-        self.name = "content_blocker"
-
-    async def evaluate(self, context):
-        text = context.text.lower()
-        for word in self.blocked_words:
-            if word in text:
-                return GuardrailDecision(
-                    passed=False,
-                    action="block",
-                    reason=f"Blocked word found: {word}",
-                )
-        return GuardrailDecision(passed=True, action="allow", reason="Clean")
 
 
 class AnalysisOutput(BaseModel):
@@ -61,7 +42,7 @@ def example_basic_reports():
     print("=" * 70)
 
     class Assistant(Agent):
-        model = Model("openai/gpt-4o-mini")
+        model = Model("openai/gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = Assistant()
@@ -102,10 +83,10 @@ def example_guardrail_blocking():
     print("Example 2: Guardrail Blocking Report")
     print("=" * 70)
 
-    guardrail = ContentBlockerGuardrail(["hack", "steal", "password"])
+    guardrail = ContentFilter(blocked_words=["hack", "steal", "password"])
 
     class Assistant(Agent):
-        model = Model("openai/gpt-4o-mini")
+        model = Model("openai/gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
         guardrails = [guardrail]
         system_prompt = "You are a helpful assistant."
 
@@ -136,7 +117,7 @@ def example_memory_operations():
     print("=" * 70)
 
     class Assistant(Agent):
-        model = Model("openai/gpt-4o-mini")
+        model = Model("openai/gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant."
 
     agent = Assistant()
@@ -171,7 +152,7 @@ def example_structured_output_validation():
     print("=" * 70)
 
     class Assistant(Agent):
-        model = Model("openai/gpt-4o-mini", output=AnalysisOutput)
+        model = Model("openai/gpt-4o-mini", output=AnalysisOutput, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You analyze text and return structured output."
 
     agent = Assistant()
@@ -199,10 +180,10 @@ def example_complete_report_summary():
     print("=" * 70)
 
     # Create agent with all features enabled
-    guardrail = ContentBlockerGuardrail(["blocked"])
+    guardrail = ContentFilter(blocked_words=["blocked"])
 
     class Assistant(Agent):
-        model = Model("openai/gpt-4o-mini", output=AnalysisOutput)
+        model = Model("openai/gpt-4o-mini", output=AnalysisOutput, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are a helpful assistant with memory."
         guardrails = [guardrail]
         budget = Budget(run=5.0)  # $5 budget
@@ -284,7 +265,7 @@ def example_report_reset():
     print("=" * 70)
 
     class Assistant(Agent):
-        model = Model("openai/gpt-4o-mini")
+        model = Model("openai/gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
 
     agent = Assistant()
 

@@ -90,9 +90,9 @@ See [Constructor Reference](constructor.md) for full parameter details.
 | Property | Type |
 |----------|------|
 | `budget_summary` | `dict[str, Any]` |
-| `memory` | `ConversationMemory | MemoryConfig | None` |
+| `memory` | `ConversationMemory | Memory | None` |
 | `conversation_memory` | `ConversationMemory | None` |
-| `persistent_memory` | `MemoryConfig | None` |
+| `persistent_memory` | `Memory | None` |
 | `context` | `Context` |
 | `context_stats` | `ContextStats` |
 | `rate_limit` | `APIRateLimit | None` |

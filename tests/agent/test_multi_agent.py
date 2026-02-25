@@ -28,7 +28,7 @@ def create_mock_provider():
 class TestHandoff:
     """Tests for Agent handoff functionality."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_handoff_basic(self, mock_get_provider):
         """Test basic handoff creates target agent and runs with context."""
         mock_get_provider.return_value = create_mock_provider()
@@ -47,7 +47,7 @@ class TestHandoff:
         assert isinstance(result, Response)
         assert result.content is not None
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_handoff_with_context_transfer(self, mock_get_provider):
         """Test handoff transfers context from source to target agent."""
         mock_get_provider.return_value = create_mock_provider()
@@ -65,7 +65,7 @@ class TestHandoff:
 
         assert isinstance(result, Response)
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_handoff_without_context_transfer(self, mock_get_provider):
         """Test handoff without context transfer."""
         mock_get_provider.return_value = create_mock_provider()
@@ -83,7 +83,7 @@ class TestHandoff:
 
         assert isinstance(result, Response)
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_handoff_with_budget_transfer(self, mock_get_provider):
         """Test handoff transfers budget from source to target agent."""
         from syrin import Budget
@@ -103,7 +103,7 @@ class TestHandoff:
 
         assert isinstance(result, Response)
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_handoff_chain(self, mock_get_provider):
         """Test multiple handoffs in sequence."""
         mock_get_provider.return_value = create_mock_provider()
@@ -130,7 +130,7 @@ class TestHandoff:
 class TestSpawn:
     """Tests for Agent spawning functionality."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_spawn_basic(self, mock_get_provider):
         """Test basic spawn creates sub-agent."""
         mock_get_provider.return_value = create_mock_provider()
@@ -147,7 +147,7 @@ class TestSpawn:
 
         assert isinstance(child, Child)
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_spawn_with_task(self, mock_get_provider):
         """Test spawn runs task on sub-agent."""
         mock_get_provider.return_value = create_mock_provider()
@@ -164,7 +164,7 @@ class TestSpawn:
 
         assert isinstance(result, Response)
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_spawn_with_budget(self, mock_get_provider):
         """Test spawn creates sub-agent with its own budget."""
         from syrin import Budget
@@ -183,7 +183,7 @@ class TestSpawn:
 
         assert child._budget is not None
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_spawn_shared_budget_child_uses_parent_tracker(self, mock_get_provider):
         """With shared budget, child uses parent's tracker (live view, no double count)."""
         from syrin import Budget
@@ -206,7 +206,7 @@ class TestSpawn:
         # Spent must match tracker: no double count from _update_parent_budget
         assert parent._budget._spent == parent._budget_tracker.current_run_cost
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_spawn_max_children_limit(self, mock_get_provider):
         """Test spawn respects max_children limit."""
         mock_get_provider.return_value = create_mock_provider()
@@ -226,7 +226,7 @@ class TestSpawn:
         with pytest.raises(RuntimeError, match="max children"):
             parent.spawn(Child, "Task 3")
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_spawn_parallel(self, mock_get_provider):
         """Test spawning multiple sub-agents in parallel."""
         mock_get_provider.return_value = create_mock_provider()
@@ -255,7 +255,7 @@ class TestSpawn:
 class TestPipeline:
     """Tests for Pipeline execution."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_pipeline_sequential(self, mock_get_provider):
         """Test sequential pipeline execution."""
         from syrin.agent.multi_agent import Pipeline
@@ -279,7 +279,7 @@ class TestPipeline:
 
         assert isinstance(result, Response)
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_pipeline_parallel(self, mock_get_provider):
         """Test parallel pipeline execution."""
         from syrin.agent.multi_agent import Pipeline
@@ -305,7 +305,7 @@ class TestPipeline:
         for result in results:
             assert isinstance(result, Response)
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_pipeline_with_shared_budget(self, mock_get_provider):
         """Test pipeline with shared budget across agents."""
         from syrin import Budget
@@ -406,7 +406,7 @@ class TestAgentTeam:
 class TestParallelSequential:
     """Tests for parallel and sequential helper functions."""
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_parallel_creates_responses(self, mock_get_provider):
         """Test parallel helper creates responses."""
         from syrin.agent.multi_agent import parallel
@@ -428,7 +428,7 @@ class TestParallelSequential:
         results = asyncio.run(run())
         assert len(results) == 2
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_sequential_creates_response(self, mock_get_provider):
         """Test sequential helper creates response."""
         from syrin.agent.multi_agent import sequential
@@ -467,7 +467,7 @@ class TestEdgeCases:
         with pytest.raises(TypeError):
             agent.handoff(None, "task")  # type: ignore
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_spawn_with_invalid_budget(self, mock_get_provider):
         """Test spawn with invalid budget - negative budget should be rejected."""
         from pydantic import ValidationError
@@ -485,7 +485,7 @@ class TestEdgeCases:
         with pytest.raises(ValidationError):
             parent.spawn(Child, budget=Budget(run=-1.0))
 
-    @patch("syrin.agent._get_provider")
+    @patch("syrin.agent._resolve_provider")
     def test_spawn_memory_isolation(self, mock_get_provider):
         """Test spawned agents have isolated memory."""
         mock_get_provider.return_value = create_mock_provider()

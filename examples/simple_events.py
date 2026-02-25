@@ -29,7 +29,7 @@ def example_simple_logging():
     print("=" * 50)
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
     )
 
@@ -52,7 +52,7 @@ def example_track_cost():
         total_cost["total"] += ctx.cost
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
     )
 
@@ -91,7 +91,7 @@ def example_tool_tracking():
 
     # Note: tool execution needs fixing - this is just for demonstration
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
         tools=[calculate],
     )
@@ -115,7 +115,7 @@ def example_on_all_events():
         print(f"  [{event}]")
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
     )
 
@@ -136,7 +136,7 @@ def example_before_hook():
         ctx["user_reminder"] = "Be concise in your response."
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
     )
 
@@ -158,7 +158,7 @@ def example_error_handling():
         print(f"  Error caught: {ctx.error}")
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are a helpful assistant.",
     )
 

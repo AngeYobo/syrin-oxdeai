@@ -11,7 +11,7 @@ from syrin.guardrails.base import Guardrail
 from syrin.guardrails.context import GuardrailContext
 from syrin.guardrails.decision import GuardrailDecision
 from syrin.guardrails.engine import EvaluationResult
-from syrin.guardrails.legacy import LegacyGuardrailResult
+from syrin.guardrails.result import GuardrailCheckResult
 
 
 class GuardrailChain:
@@ -115,8 +115,8 @@ class GuardrailChain:
         *,
         budget: Any = None,
         agent: Any = None,
-    ) -> LegacyGuardrailResult:
-        """Legacy check method for backward compatibility.
+    ) -> GuardrailCheckResult:
+        """Sync check method for running guardrails in sync context.
 
         Args:
             text: Text to check.
@@ -125,11 +125,10 @@ class GuardrailChain:
             agent: Optional agent reference for guardrail context.
 
         Returns:
-            LegacyGuardrailResult with passed status.
+            GuardrailCheckResult with passed status.
         """
         from syrin.guardrails.context import GuardrailContext
         from syrin.guardrails.enums import GuardrailStage
-        from syrin.guardrails.legacy import LegacyGuardrailResult
 
         # Create context with proper stage
         if stage is None:
@@ -156,18 +155,16 @@ class GuardrailChain:
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 result = pool.submit(run_in_thread).result()
         else:
-            # No running loop - use asyncio.run for clean lifecycle
             result = asyncio.run(self.evaluate(context))
 
-        # Convert EvaluationResult to LegacyGuardrailResult
         first_failure = next((d for d in result.decisions if not d.passed), None)
         if first_failure:
-            return LegacyGuardrailResult(
+            return GuardrailCheckResult(
                 passed=False,
                 reason=first_failure.reason,
                 metadata=first_failure.metadata,
             )
-        return LegacyGuardrailResult(passed=True)
+        return GuardrailCheckResult(passed=True)
 
     def __len__(self) -> int:
         """Return number of guardrails in chain."""

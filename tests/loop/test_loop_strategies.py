@@ -3,12 +3,21 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from syrin.enums import LoopStrategy
+from syrin.agent._run_context import DefaultAgentRunContext
+from syrin.enums import LoopStrategy, MessageRole
 from syrin.loop import (
     CodeActionLoop,
     PlanExecuteLoop,
 )
-from syrin.types import TokenUsage, ToolCall
+from syrin.types import Message, TokenUsage, ToolCall
+
+
+def _run_ctx(mock_agent: MagicMock) -> DefaultAgentRunContext:
+    """Wrap a mock agent so loop receives AgentRunContext. Ensures _build_messages returns a list."""
+    mock_agent._build_messages = MagicMock(
+        return_value=[Message(role=MessageRole.USER, content="test")]
+    )
+    return DefaultAgentRunContext(mock_agent)
 
 
 class TestPlanExecuteLoop:
@@ -112,7 +121,7 @@ class TestPlanExecuteLoop:
         mock_agent._emit_event = MagicMock()
         mock_agent._check_and_apply_budget = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "Test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "Test"))
 
         assert result.cost_usd > 0
 
@@ -297,7 +306,7 @@ class TestCodeActionLoop:
         mock_agent._emit_event = MagicMock()
         mock_agent._check_and_apply_budget = MagicMock()
 
-        result = asyncio.run(loop.run(mock_agent, "Test"))
+        result = asyncio.run(loop.run(_run_ctx(mock_agent), "Test"))
 
         assert result.cost_usd > 0
 

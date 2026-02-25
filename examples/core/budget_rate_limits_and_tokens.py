@@ -21,9 +21,9 @@ from syrin import (
     Agent,
     Budget,
     Context,
-    ContextBudget,
     Model,
     RateLimit,
+    TokenLimits,
     TokenRateLimit,
     raise_on_exceeded,
     warn_on_exceeded,
@@ -45,11 +45,11 @@ def example_budget_plus_token_limits() -> None:
     print("=" * 55)
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are concise. Answer in one short paragraph.",
         budget=Budget(run=0.05, on_exceeded=warn_on_exceeded),
         context=Context(
-            budget=ContextBudget(
+            budget=TokenLimits(
                 run=15_000,
                 per=TokenRateLimit(hour=50_000, day=200_000),
                 on_exceeded=warn_on_exceeded,
@@ -69,7 +69,7 @@ def example_rate_limits_plus_token_limits() -> None:
     print("=" * 55)
 
     agent = Agent(
-        model=Model(MODEL_ID),
+        model=Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY")),
         system_prompt="You are concise. Answer in one short paragraph.",
         budget=Budget(
             run=0.05,
@@ -77,7 +77,7 @@ def example_rate_limits_plus_token_limits() -> None:
             on_exceeded=warn_on_exceeded,
         ),
         context=Context(
-            budget=ContextBudget(
+            budget=TokenLimits(
                 run=15_000,
                 per=TokenRateLimit(hour=50_000, day=200_000),
                 on_exceeded=warn_on_exceeded,
@@ -103,7 +103,7 @@ def example_persistent_rate_limits_with_file_store() -> None:
     store_path.parent.mkdir(parents=True, exist_ok=True)
 
     class PersistentBudgetAgent(Agent):
-        model = Model(MODEL_ID)
+        model = Model(MODEL_ID, api_key=os.getenv("OPENAI_API_KEY"))
         system_prompt = "You are concise."
         budget = Budget(
             run=0.10,

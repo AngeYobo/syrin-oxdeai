@@ -270,10 +270,10 @@ Syrin automatically instruments guardrails when you add them to your agent:
 
 ```python
 from Syrin import Agent, Model
-from Syrin.guardrails import BlockedWordsGuardrail
+from Syrin.guardrails import ContentFilter
 
 # Create guardrail
-blocked = BlockedWordsGuardrail(
+blocked = ContentFilter(
     blocked_words=["badword", "forbidden"],
     name="content_filter"
 )
@@ -311,13 +311,13 @@ Memory operations (when using persistent memory) are automatically instrumented:
 
 ```python
 from Syrin import Agent, Model
-from Syrin.memory.config import Memory as MemoryConfig
+from syrin.memory import Memory
 from Syrin.enums import MemoryType
 
 class MemoryAgent(Agent):
     model = Model("openai/gpt-4o-mini")
     system_prompt = "You are helpful."
-    persistent_memory = MemoryConfig(
+    persistent_memory = Memory(
         backend="memory",
     )
 
@@ -711,7 +711,7 @@ Here's a complete production-ready setup:
 
 ```python
 from Syrin import Agent, Model
-from Syrin.guardrails import BlockedWordsGuardrail
+from Syrin.guardrails import ContentFilter
 from Syrin.observability import (
     ConsoleExporter,
     InMemoryExporter,
@@ -743,7 +743,7 @@ tracer.set_collect_metrics(True)
 metrics = get_metrics()
 
 # 5. Create agent with guardrails
-blocked = BlockedWordsGuardrail(
+blocked = ContentFilter(
     blocked_words=["spam", "forbidden"],
     name="content_filter"
 )

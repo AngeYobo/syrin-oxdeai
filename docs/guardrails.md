@@ -1607,9 +1607,9 @@ if budget.remaining < 0.10:
 ### Old API
 
 ```python
-from Syrin.guardrails import BlockedWordsGuardrail
+from Syrin.guardrails import ContentFilter
 
-guardrail = BlockedWordsGuardrail(blocked_words=["bad"])
+guardrail = ContentFilter(blocked_words=["bad"])
 result = guardrail.check(text, stage)
 ```
 
@@ -1622,8 +1622,6 @@ guardrail = ContentFilter(blocked_words=["bad"])
 context = GuardrailContext(text=text, stage=stage)
 result = await guardrail.evaluate(context)
 ```
-
-**Backward Compatibility:** Old API still works via wrapper methods.
 
 ---
 

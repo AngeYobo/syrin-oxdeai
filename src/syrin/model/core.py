@@ -19,6 +19,8 @@ from syrin.types import (
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator
+
+    from syrin.providers.base import Provider
 else:
     from collections.abc import Iterator  # Runtime for cast()
 
@@ -916,7 +918,18 @@ class Model:
             from syrin.providers.litellm import LiteLLMProvider
 
             return LiteLLMProvider()
+        from syrin.providers.litellm import LiteLLMProvider
+
         return LiteLLMProvider()
+
+    def get_provider(self) -> Provider:
+        """Return the Provider instance for this model.
+
+        Use when you need the low-level Provider (e.g. Agent uses this to call complete).
+        """
+        from syrin.providers.base import Provider as ProviderCls
+
+        return cast(ProviderCls, self._get_provider_instance())
 
     def complete(
         self,

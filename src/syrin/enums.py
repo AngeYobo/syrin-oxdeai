@@ -215,6 +215,8 @@ class Hook(StrEnum):
     CHECKPOINT_LOAD = "checkpoint.load"
 
     CONTEXT_COMPRESS = "context.compress"
+    CONTEXT_COMPACT = "context.compact"
+    CONTEXT_THRESHOLD = "context.threshold"
     CONTEXT_OFFLOAD = "context.offload"
     CONTEXT_RESTORE = "context.restore"
 
@@ -365,17 +367,6 @@ class ThresholdMetric(StrEnum):
 
     COST = "cost"  # Budget cost (USD)
     TOKENS = "tokens"  # Context tokens
-    RPM = "rpm"  # Requests per minute
-    TPM = "tpm"  # Tokens per minute
-    RPD = "rpd"  # Requests per day
-
-
-class RateLimitMetric(StrEnum):
-    """Metrics that can be tracked for rate limiting.
-
-    Deprecated: Use ThresholdMetric instead.
-    """
-
     RPM = "rpm"  # Requests per minute
     TPM = "tpm"  # Tokens per minute
     RPD = "rpd"  # Requests per day

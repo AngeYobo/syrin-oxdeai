@@ -37,6 +37,8 @@ class _ContextFacade:
         return getattr(self._config, name)
 
 
+from syrin.agent._context_builder import build_messages as build_messages_for_llm
+from syrin.agent._run_context import DefaultAgentRunContext
 from syrin.cost import calculate_cost, estimate_cost_for_call
 from syrin.enums import (
     GuardrailStage,
@@ -44,7 +46,6 @@ from syrin.enums import (
     LoopStrategy,
     MemoryBackend,
     MemoryType,
-    MessageRole,
     RateLimitAction,
     StopReason,
 )
@@ -52,9 +53,8 @@ from syrin.events import EventContext, Events
 from syrin.exceptions import BudgetExceededError, BudgetThresholdError, ToolExecutionError
 from syrin.guardrails import Guardrail, GuardrailChain, GuardrailResult
 from syrin.loop import Loop, LoopStrategyMapping, ReactLoop
-from syrin.memory import ConversationMemory
+from syrin.memory import ConversationMemory, Memory
 from syrin.memory.backends import InMemoryBackend, get_backend
-from syrin.memory.config import Memory as MemoryConfig
 from syrin.memory.config import MemoryEntry
 from syrin.model import Model
 from syrin.observability import (
@@ -116,23 +116,37 @@ def _merge_class_attrs(mro: tuple[type, ...], name: str, merge: bool) -> Any:
     return _UNSET
 
 
-def _get_provider(provider_name: str) -> Provider:
-    """Return the Provider instance for the given provider name."""
-    if provider_name == "anthropic":
-        from syrin.providers.anthropic import AnthropicProvider
+def _resolve_provider(model: Model | None, model_config: ModelConfig) -> Provider:
+    """Resolve Provider from Model (preferred) or ModelConfig.provider via registry."""
+    if model is not None and hasattr(model, "get_provider"):
+        return model.get_provider()
+    from syrin.providers.registry import get_provider
 
-        return AnthropicProvider()
-    if provider_name == "openai":
-        from syrin.providers.openai import OpenAIProvider
+    return get_provider(model_config.provider)
 
-        return OpenAIProvider()
-    if provider_name in ("ollama", "litellm"):
-        from syrin.providers.litellm import LiteLLMProvider
 
-        return LiteLLMProvider()
-    from syrin.providers.litellm import LiteLLMProvider
+def _emit_domain_event_for_hook(hook: Hook, ctx: EventContext, bus: Any) -> None:
+    """Emit domain events for hooks that have typed domain event equivalents."""
+    if hook == Hook.BUDGET_THRESHOLD:
+        from syrin.domain_events import BudgetThresholdReached
 
-    return LiteLLMProvider()
+        pct = ctx.get("threshold_percent", 0)
+        current = ctx.get("current_value", 0.0)
+        limit = ctx.get("limit_value", 0.0)
+        metric = ctx.get("metric", "cost")
+        bus.emit(BudgetThresholdReached(pct, current, limit, metric))
+    elif hook == Hook.CONTEXT_COMPACT:
+        from syrin.domain_events import ContextCompacted
+
+        bus.emit(
+            ContextCompacted(
+                method=ctx.get("method", "unknown"),
+                tokens_before=ctx.get("tokens_before", 0),
+                tokens_after=ctx.get("tokens_after", 0),
+                messages_before=ctx.get("messages_before", 0),
+                messages_after=ctx.get("messages_after", 0),
+            )
+        )
 
 
 class Agent:
@@ -202,7 +216,7 @@ class Agent:
         max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
         budget_store: BudgetStore | None = None,
         budget_store_key: str = "default",
-        memory: ConversationMemory | MemoryConfig | None = None,
+        memory: ConversationMemory | Memory | None = None,
         loop_strategy: LoopStrategy = LoopStrategy.REACT,
         loop: Loop | type[Loop] | None = None,
         guardrails: list[Guardrail] | GuardrailChain | None = _UNSET,
@@ -211,27 +225,27 @@ class Agent:
         checkpoint: CheckpointConfig | Checkpointer | None = None,
         debug: bool = False,
         tracer: Any = None,
+        bus: Any = None,
     ) -> None:
         """Create an agent with model, prompt, tools, and optional config.
 
-        Args:
-            model: LLM to use (required). Use Model.OpenAI, Model.Anthropic, etc.
-                Why: The brain of your agent. Required.
-            system_prompt: Instructions that define behavior. Sent with every request.
-                Why: Shapes personality and constraints. Default: empty.
-            tools: List of @tool-decorated functions the agent can call.
-                Why: Gives the agent abilities (search, calculate, etc.).
-            budget: Cost limits (per run, per period) and threshold actions.
-                Why: Prevents runaway spending. Use Budget(run=1.0) for $1/run.
+        **Required:**
+            model: LLM to use. Use Model.OpenAI, Model.Anthropic, etc. The brain of your agent.
+
+        **Core (most users need these):**
+            system_prompt: Instructions that define behavior. Sent with every request. Default: empty.
+            tools: List of @tool-decorated functions the agent can call. Default: [].
+            budget: Cost limits (per run, per period) and threshold actions. Use Budget(run=1.0) for $1/run.
+
+        **Optional (advanced):**
             output: Structured output config (Pydantic model). Validates responses.
-                Why: Get typed, validated output instead of raw text.
             max_tool_iterations: Max tool-call loops per response (default 10).
                 Why: Stops infinite tool loops. Increase for complex workflows.
             budget_store: Persist budget across runs (e.g. FileBudgetStore).
                 Why: Track spend across restarts. Requires budget_store_key.
             budget_store_key: Key for budget persistence (default "default").
                 Why: Isolate budgets per user/session when using budget_store.
-            memory: Conversation memory (BufferMemory) or persistent MemoryConfig.
+            memory: Conversation memory (BufferMemory) or persistent Memory.
                 Why: Enables remember/recall/forget or session history.
             loop_strategy: Execution strategy (REACT, SINGLE_SHOT, etc.).
                 Why: REACT = tool loop; SINGLE_SHOT = one LLM call, no tools.
@@ -239,7 +253,7 @@ class Agent:
             guardrails: List of Guardrail or GuardrailChain. Validate input/output.
                 Why: Block harmful content, PII, or policy violations.
             context: Context config (max_tokens, thresholds, budget). Token caps
-                go in context.budget (ContextBudget / TokenLimits).
+                go in context.budget (TokenLimits).
             rate_limit: APIRateLimit to enforce RPM/TPM.
                 Why: Avoid 429 errors from provider rate limits.
             checkpoint: CheckpointConfig for save/restore state.
@@ -247,6 +261,9 @@ class Agent:
             debug: If True, print lifecycle events to console.
                 Why: Quick visibility into agent behavior.
             tracer: Custom tracer for observability.
+            bus: Optional EventBus for typed domain events (BudgetThresholdReached,
+                ContextCompacted). Use when you need structured event handling for
+                metrics, observability, or custom pipelines. See docs/event-bus.md.
 
         Example:
             >>> agent = Agent(
@@ -254,7 +271,7 @@ class Agent:
             ...     system_prompt="You are concise.",
             ...     tools=[search, calculate],
             ...     budget=Budget(run=0.50),
-            ...     memory=MemoryConfig(top_k=5),
+            ...     memory=Memory(top_k=5),
             ... )
         """
         cls = self.__class__
@@ -290,7 +307,7 @@ class Agent:
         self._budget_store_key = budget_store_key
         self._token_limits = None
         self._conversation_memory: ConversationMemory | None = None
-        self._persistent_memory: MemoryConfig | None = None
+        self._persistent_memory: Memory | None = None
         self._memory_backend: InMemoryBackend | None = None
         self._parent_agent: Agent | None = None
         self._budget_tracker_shared: bool = False
@@ -308,12 +325,12 @@ class Agent:
 
         if memory is None:
             # Default: enable persistent memory with sensible defaults
-            self._persistent_memory = MemoryConfig(
+            self._persistent_memory = Memory(
                 types=[MemoryType.CORE, MemoryType.EPISODIC],
                 top_k=10,
             )
             self._memory_backend = get_backend(MemoryBackend.MEMORY)
-        elif isinstance(memory, MemoryConfig):
+        elif isinstance(memory, Memory):
             self._persistent_memory = memory
             self._memory_backend = get_backend(memory.backend, path=memory.path)
         else:
@@ -323,7 +340,7 @@ class Agent:
             self._budget_tracker = loaded if loaded is not None else BudgetTracker()
         else:
             self._budget_tracker = BudgetTracker()
-        self._provider = _get_provider(self._model_config.provider)
+        self._provider = _resolve_provider(self._model, self._model_config)
         self._agent_name = self.__class__.__name__
         if self._budget is not None:
             self._budget._consume_callback = self._make_budget_consume_callback()
@@ -368,6 +385,7 @@ class Agent:
         # Observability setup (before context to pass tracer)
         self._debug = debug
         self._tracer = tracer or get_tracer()
+        self._bus = bus
         if debug and not any(isinstance(e, ConsoleExporter) for e in self._tracer._exporters):
             self._tracer.add_exporter(ConsoleExporter())
         if debug:
@@ -571,13 +589,29 @@ class Agent:
         """
         return self._run_report
 
-    def _emit_event(self, hook: Hook, ctx: EventContext) -> None:
+    def _emit_event(self, hook: Hook | str, ctx: EventContext | dict[str, Any]) -> None:
         """Internal: trigger a hook through the events system.
 
         Args:
-            hook: Hook enum value (e.g., Hook.AGENT_RUN_START)
-            ctx: EventContext with hook-specific data
+            hook: Hook enum value or string (e.g. "context.compact")
+            ctx: EventContext or dict with hook-specific data
         """
+        # Map string event names (from context/ratelimit managers) to Hook
+        # StrEnum members are also str, so check for Hook first
+        if isinstance(hook, str) and not isinstance(hook, Hook):
+            _EVENT_TO_HOOK: dict[str, Hook] = {
+                "context.compact": Hook.CONTEXT_COMPACT,
+                "context.threshold": Hook.CONTEXT_THRESHOLD,
+                "ratelimit.threshold": Hook.RATELIMIT_THRESHOLD,
+                "ratelimit.exceeded": Hook.RATELIMIT_EXCEEDED,
+            }
+            resolved = _EVENT_TO_HOOK.get(hook)
+            if resolved is None:
+                return
+            hook = resolved
+        if isinstance(ctx, dict):
+            ctx = EventContext(ctx)
+
         # Print event to console when debug=True
         if self._debug:
             self._print_event(hook.value, ctx)
@@ -586,6 +620,11 @@ class Agent:
         self.events._trigger_before(hook, ctx)
         self.events._trigger(hook, ctx)
         self.events._trigger_after(hook, ctx)
+
+        # Domain events (observability, typed consumers)
+        bus = getattr(self, "_bus", None)
+        if bus is not None:
+            _emit_domain_event_for_hook(hook, ctx, bus)
 
     def _print_event(self, event: str, ctx: EventContext) -> None:
         """Print event to console when debug=True."""
@@ -694,7 +733,7 @@ class Agent:
         else:
             self._model = None
             self._model_config = model
-        self._provider = _get_provider(self._model_config.provider)
+        self._provider = _resolve_provider(self._model, self._model_config)
 
     @property
     def budget_summary(self) -> dict[str, Any]:
@@ -736,14 +775,14 @@ class Agent:
         )
 
     @property
-    def memory(self) -> ConversationMemory | MemoryConfig | None:
+    def memory(self) -> ConversationMemory | Memory | None:
         """Active memory: conversation (session) or persistent (remember/recall).
 
         Why: Inspect what memory type is in use. Use conversation_memory or
         persistent_memory for specific type.
 
         Returns:
-            ConversationMemory if session history; MemoryConfig if persistent.
+            ConversationMemory if session history; Memory if persistent.
         """
         return self._persistent_memory or self._conversation_memory
 
@@ -760,14 +799,14 @@ class Agent:
         return self._conversation_memory
 
     @property
-    def persistent_memory(self) -> MemoryConfig | None:
+    def persistent_memory(self) -> Memory | None:
         """Persistent memory config (remember/recall/forget).
 
         Why: Check top_k, types, backend when using persistent memory.
         Enables remember(), recall(), forget().
 
         Returns:
-            MemoryConfig if persistent memory enabled; None otherwise.
+            Memory if persistent memory enabled; None otherwise.
         """
         return self._persistent_memory
 
@@ -798,6 +837,11 @@ class Agent:
     def _context_manager(self) -> DefaultContextManager:
         """Internal context manager."""
         return self._context
+
+    @property
+    def run_context(self) -> DefaultAgentRunContext:
+        """Narrow interface for Loop.run(). Used internally; loops receive this instead of Agent."""
+        return DefaultAgentRunContext(self)
 
     @property
     def rate_limit(self) -> APIRateLimit | None:
@@ -863,7 +907,7 @@ class Agent:
         Memory types: CORE (identity/prefs), EPISODIC (events), SEMANTIC (facts),
         PROCEDURAL (patterns). Importance 0.0–1.0 affects recall ranking.
 
-        Requires persistent memory (MemoryConfig). Use memory=False to disable.
+        Requires persistent memory (Memory). Use memory=False to disable.
 
         Args:
             content: Text to store (e.g. "User prefers dark mode").
@@ -1161,9 +1205,9 @@ class Agent:
                 memories = self._memory_backend.list()
                 if memories:
                     if target._memory_backend is None:
-                        target._persistent_memory = MemoryConfig(top_k=10, relevance_threshold=0.7)
+                        target._persistent_memory = Memory(top_k=10, relevance_threshold=0.7)
                         target._memory_backend = get_backend(
-                            MemoryConfig(top_k=10, relevance_threshold=0.7).backend
+                            Memory(top_k=10, relevance_threshold=0.7).backend
                         )
                     for mem in memories:
                         target.remember(
@@ -1316,109 +1360,27 @@ class Agent:
         return loop.run_until_complete(run_all())
 
     def _build_messages(self, user_input: str) -> list[Message]:
-        messages: list[Message] = []
+        def get_budget() -> Any:
+            model_for_context = self._model if self._model is not None else None
+            call_ctx = getattr(self, "_call_context", None)
+            if call_ctx is not None:
+                return call_ctx.get_budget(model_for_context)
+            if hasattr(self._context, "context"):
+                return self._context.context.get_budget(model_for_context)
+            return Context().get_budget(model_for_context)
 
-        # Build system prompt (memory context is handled by context manager)
-        system_content = self._system_prompt or ""
-        memory_context = ""
-
-        # Auto-inject relevant persistent memories - pass to context manager
-        if self._memory_backend is not None:
-            with self._tracer.span(
-                "memory.recall",
-                kind=SpanKind.MEMORY,
-                attributes={
-                    SemanticAttributes.MEMORY_OPERATION: "recall",
-                },
-            ) as mem_span:
-                # Search for relevant memories based on user input
-                top_k = self._persistent_memory.top_k if self._persistent_memory else 10
-                memories = self._memory_backend.search(user_input, None, top_k)
-
-                mem_span.set_attribute(
-                    SemanticAttributes.MEMORY_RESULTS_COUNT,
-                    len(memories),
-                )
-
-                if memories:
-                    # Format memories for context manager
-                    memory_context = "## Relevant Memories:\n"
-                    for mem in memories:
-                        memory_context += f"- [{mem.type.value}] {mem.content}\n"
-
-        # Add system prompt if present
-        if system_content:
-            messages.append(Message(role=MessageRole.SYSTEM, content=system_content))
-
-        # Add conversation memory
-        if self._conversation_memory is not None:
-            # Memory recall span
-            with self._tracer.span(
-                "memory.recall",
-                kind=SpanKind.MEMORY,
-                attributes={
-                    SemanticAttributes.MEMORY_OPERATION: "recall",
-                },
-            ) as mem_span:
-                mem_messages = self._conversation_memory.get_messages()
-                mem_span.set_attribute(
-                    SemanticAttributes.MEMORY_RESULTS_COUNT,
-                    len(mem_messages),
-                )
-                messages.extend(mem_messages)
-
-        messages.append(Message(role=MessageRole.USER, content=user_input))
-
-        # Apply context management (compaction if needed)
-        msg_dicts = []
-        for msg in messages:
-            msg_dicts.append(
-                {
-                    "role": msg.role.value if hasattr(msg.role, "value") else str(msg.role),
-                    "content": msg.content,
-                }
-            )
-
-        # Get tool specs
-        tool_dicts = []
-        for tool in self._tools:
-            if hasattr(tool, "to_tool_spec"):
-                tool_dicts.append(tool.to_tool_spec())
-            elif isinstance(tool, dict):
-                tool_dicts.append(tool)
-
-        # Use context manager to prepare context
-        model_for_context = self._model if self._model is not None else None
-        call_context = getattr(self, "_call_context", None)
-
-        # Get budget - call context (override), then manager's context, else default
-        if call_context is not None:
-            budget = call_context.get_budget(model_for_context)
-        elif hasattr(self._context, "context"):
-            budget = self._context.context.get_budget(model_for_context)
-        else:
-            budget = Context().get_budget(model_for_context)
-
-        payload = self._context.prepare(
-            messages=msg_dicts,
-            system_prompt=self._system_prompt,
-            tools=tool_dicts,
-            memory_context=memory_context,
-            budget=budget,
-            context=call_context,
+        return build_messages_for_llm(
+            user_input,
+            system_prompt=self._system_prompt or "",
+            tools=self._tools,
+            conversation_memory=self._conversation_memory,
+            memory_backend=self._memory_backend,
+            persistent_memory=self._persistent_memory,
+            context_manager=self._context,
+            get_budget=get_budget,
+            call_context=getattr(self, "_call_context", None),
+            tracer=self._tracer,
         )
-
-        # Rebuild messages from payload
-        final_messages = []
-        for msg_dict in payload.messages:
-            msg_data: dict[str, Any] = msg_dict
-            role = msg_data.get("role", "user")
-            if hasattr(MessageRole, role.upper()):
-                final_messages.append(
-                    Message(role=MessageRole(role), content=msg_data.get("content", ""))
-                )
-
-        return final_messages
 
     def _build_output(
         self,
@@ -1606,6 +1568,28 @@ class Agent:
         result: CheckBudgetResult = self._budget_tracker.check_budget(
             self._budget, token_limits=self._token_limits, parent=self
         )
+        if result.status == BudgetStatus.THRESHOLD:
+            # Emit BUDGET_THRESHOLD hook and domain event for observability
+            current = self._budget_tracker.current_run_cost
+            limit = (
+                (self._budget.run - self._budget.reserve)
+                if self._budget is not None
+                and self._budget.run is not None
+                and self._budget.reserve is not None
+                and self._budget.run > self._budget.reserve
+                else (self._budget.run if self._budget and self._budget.run else 0.0)
+            )
+            pct = int((current / limit) * 100) if limit and limit > 0 else 0
+            self._emit_event(
+                Hook.BUDGET_THRESHOLD,
+                EventContext(
+                    threshold_percent=pct,
+                    current_value=current,
+                    limit_value=limit,
+                    metric="cost",
+                ),
+            )
+            return
         if result.status != BudgetStatus.EXCEEDED:
             return
         limit_key = result.exceeded_limit or BudgetLimitType.RUN
@@ -1887,7 +1871,7 @@ class Agent:
                     )
                 )
 
-            result = await self._loop.run(self, user_input)
+            result = await self._loop.run(self.run_context, user_input)
 
             # Auto-checkpoint after step completion
             self._maybe_checkpoint("step")
@@ -2230,3 +2214,11 @@ class Agent:
                 raise ToolExecutionError(f"Streaming failed: {e}") from e
         finally:
             self._call_context = None
+
+
+# Presets and builder
+from syrin.agent import presets as _presets
+from syrin.agent.builder import AgentBuilder as _AgentBuilder
+
+Agent.presets = _presets  # type: ignore[attr-defined]
+Agent.builder = staticmethod(lambda model: _AgentBuilder(model))  # type: ignore[assignment]

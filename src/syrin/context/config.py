@@ -11,10 +11,6 @@ if TYPE_CHECKING:
 from syrin.budget import TokenLimits
 from syrin.context.compactors import ContextCompactorProtocol
 
-# User-facing token caps on Context (run, per, on_exceeded) — same field names as Budget
-ContextBudget = TokenLimits
-TokenBudget = TokenLimits  # backward-compat alias
-
 
 @dataclass
 class ContextStats:
@@ -43,7 +39,7 @@ class ContextStats:
 class ContextWindowBudget:
     """Internal window capacity used during context prepare (max tokens, reserve, utilization).
 
-    Not for end users: use Context and ContextBudget (token caps) instead.
+    Not for end users: use Context and TokenLimits (token caps) instead.
     Compaction is not automatic; use ctx.compact() in a ContextThreshold action
     or agent.context.compact() during prepare (e.g. from a threshold action).
     """
@@ -85,10 +81,6 @@ class ContextWindowBudget:
         self._used_tokens = 0
 
 
-# Alias: use-case name for "window capacity" (internal).
-WindowCapacity = ContextWindowBudget
-
-
 @dataclass
 class Context:
     """Context window configuration: limits, compaction triggers, and token caps.
@@ -96,7 +88,7 @@ class Context:
     Provides context window management. Compaction is on-demand: call
     ctx.compact() from a ContextThreshold action (e.g. at 75% to compact).
 
-    **Budget vs token caps:** ``Budget`` = cost limits (USD). ``budget`` (ContextBudget) =
+    **Budget vs token caps:** ``Budget`` = cost limits (USD). ``budget`` (TokenLimits) =
     context's token caps (run and/or per period). Same field names (run, per, on_exceeded) for consistency.
 
     Example:
@@ -119,7 +111,7 @@ class Context:
     """Tokens reserved for model output; subtracted from max_tokens to get available. ≥ 0."""
     thresholds: list[ContextThreshold] = field(default_factory=list)
     """When utilization hits these percentages, actions run (e.g. compact at 75%)."""
-    budget: ContextBudget | None = None
+    budget: TokenLimits | None = None
     """Context's token caps (run and/or per period). Same names as Budget: run, per, on_exceeded."""
     encoding: str = "cl100k_base"
     """TokenCounter encoding. Default context manager uses it for counting."""
@@ -183,8 +175,5 @@ class Context:
 __all__ = [
     "Context",
     "ContextStats",
-    "ContextBudget",
     "ContextWindowBudget",
-    "WindowCapacity",
-    "TokenBudget",
 ]

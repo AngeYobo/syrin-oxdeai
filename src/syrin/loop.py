@@ -23,6 +23,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from syrin.agent._run_context import AgentRunContext
 from syrin.enums import Hook, LoopStrategy, MessageRole, StopReason
 
 
@@ -50,19 +51,21 @@ ToolApprovalFn = Callable[[str, dict[str, Any]], Awaitable[bool]]
 class Loop:
     """Protocol for custom loop strategies.
 
-    Implement this to create your own loop:
+    Implement this to create your own loop. The run context provides
+    build_messages, complete, execute_tool, emit_event, budget/rate-limit
+    checks, and model_id/tools/max_output_tokens for cost calculation.
 
     class MyLoop:
         name = "my_loop"
 
-        async def run(self, agent: Agent, user_input: str) -> LoopResult:
+        async def run(self, ctx: AgentRunContext, user_input: str) -> LoopResult:
             ...
     """
 
     name: str = "base"
 
-    async def run(self, agent: Any, user_input: str) -> LoopResult:
-        """Execute the loop. Override in subclasses."""
+    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
+        """Execute the loop. Override in subclasses. ctx is AgentRunContext."""
         raise NotImplementedError
 
 
@@ -74,43 +77,36 @@ class SingleShotLoop(Loop):
 
     name = "single_shot"
 
-    async def run(self, agent: Any, user_input: str) -> LoopResult:
+    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
         """Execute single LLM call."""
+        from syrin.cost import calculate_cost
         from syrin.events import EventContext
 
-        messages = agent._build_messages(user_input)
+        messages = ctx.build_messages(user_input)
         run_start = time.perf_counter()
 
-        agent._emit_event(
+        ctx.emit_event(
             Hook.AGENT_RUN_START,
             EventContext(
                 input=user_input,
-                model=agent._model_config.model_id,
+                model=ctx.model_id,
                 iteration=0,
             ),
         )
 
-        agent._check_and_apply_rate_limit()
-        _max_ot = (
-            (getattr(agent._model, "metadata", None) or {}).get("max_output_tokens", 1024)
-            if getattr(agent, "_model", None)
-            else 1024
-        )
-        agent._pre_call_budget_check(messages, max_output_tokens=_max_ot)
-        response = await agent.complete(messages)
-        if agent._rate_limit_manager_internal is not None:
-            agent._record_rate_limit_usage(response.token_usage)
-        if agent._budget is not None:
-            agent._record_cost(response.token_usage, agent._model_config.model_id)
+        ctx.check_and_apply_rate_limit()
+        ctx.pre_call_budget_check(messages, max_output_tokens=ctx.max_output_tokens)
+        response = await ctx.complete(messages)
+        if ctx.has_rate_limit:
+            ctx.record_rate_limit_usage(response.token_usage)
+        if ctx.has_budget:
+            ctx.record_cost(response.token_usage, ctx.model_id)
 
         latency_ms = (time.perf_counter() - run_start) * 1000
         content = response.content or ""
 
         u = response.token_usage
-        pricing = getattr(agent._model, "pricing", None) if agent._model else None
-        from syrin.cost import calculate_cost
-
-        cost_usd = calculate_cost(agent._model_config.model_id, u, pricing_override=pricing)
+        cost_usd = calculate_cost(ctx.model_id, u, pricing_override=ctx.pricing_override)
 
         tool_calls = []
         tool_names = []
@@ -128,7 +124,7 @@ class SingleShotLoop(Loop):
         # Extract stop_reason from response, default to "end_turn"
         stop_reason = response.stop_reason or "end_turn"
 
-        agent._emit_event(
+        ctx.emit_event(
             Hook.AGENT_RUN_END,
             EventContext(
                 content=content,
@@ -165,50 +161,46 @@ class ReactLoop(Loop):
     def __init__(self, max_iterations: int = 10):
         self.max_iterations = max_iterations
 
-    async def run(self, agent: Any, user_input: str) -> LoopResult:
+    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
         """Execute REACT loop."""
+        from syrin.cost import calculate_cost
         from syrin.events import EventContext
-        from syrin.types import Message
+        from syrin.types import Message, TokenUsage
 
-        messages = agent._build_messages(user_input)
-        tools = agent._tools if agent._tools else None
+        messages = ctx.build_messages(user_input)
+        tools = ctx.tools
         iteration = 0
         tools_used = []
         tool_calls_all = []
         run_start = time.perf_counter()
 
-        agent._emit_event(
+        ctx.emit_event(
             Hook.AGENT_RUN_START,
             EventContext(
                 input=user_input,
-                model=agent._model_config.model_id,
+                model=ctx.model_id,
                 iteration=0,
             ),
         )
 
         while iteration < self.max_iterations:
             iteration += 1
-            agent._check_and_apply_budget()
-            agent._check_and_apply_rate_limit()
-            _max_ot = (
-                (getattr(agent._model, "metadata", None) or {}).get("max_output_tokens", 1024)
-                if getattr(agent, "_model", None)
-                else 1024
-            )
-            agent._pre_call_budget_check(messages, max_output_tokens=_max_ot)
+            ctx.check_and_apply_budget()
+            ctx.check_and_apply_rate_limit()
+            ctx.pre_call_budget_check(messages, max_output_tokens=ctx.max_output_tokens)
 
-            agent._emit_event(Hook.LLM_REQUEST_START, EventContext(iteration=iteration))
+            ctx.emit_event(Hook.LLM_REQUEST_START, EventContext(iteration=iteration))
 
-            response = await agent.complete(messages, tools)
+            response = await ctx.complete(messages, tools)
 
-            if agent._rate_limit_manager_internal is not None:
-                agent._record_rate_limit_usage(response.token_usage)
-            if agent._budget is not None:
-                agent._record_cost(response.token_usage, agent._model_config.model_id)
+            if ctx.has_rate_limit:
+                ctx.record_rate_limit_usage(response.token_usage)
+            if ctx.has_budget:
+                ctx.record_cost(response.token_usage, ctx.model_id)
 
             stop_reason = getattr(response, "stop_reason", None) or StopReason.END_TURN
 
-            agent._emit_event(
+            ctx.emit_event(
                 Hook.LLM_REQUEST_END,
                 EventContext(
                     content=response.content or "",
@@ -239,7 +231,7 @@ class ReactLoop(Loop):
                     }
                 )
 
-                agent._emit_event(
+                ctx.emit_event(
                     Hook.TOOL_CALL_START,
                     EventContext(
                         name=tool_name,
@@ -249,7 +241,7 @@ class ReactLoop(Loop):
                 )
 
                 try:
-                    result = await agent.execute_tool(tool_name, tool_args)
+                    result = await ctx.execute_tool(tool_name, tool_args)
                     messages.append(
                         Message(
                             role=MessageRole.TOOL,
@@ -258,7 +250,7 @@ class ReactLoop(Loop):
                         )
                     )
                 except Exception as e:
-                    agent._emit_event(
+                    ctx.emit_event(
                         Hook.TOOL_ERROR,
                         EventContext(
                             error=str(e),
@@ -278,7 +270,6 @@ class ReactLoop(Loop):
 
         total_input = 0
         total_output = 0
-        total_cost = 0.0
 
         for msg in messages:
             if hasattr(msg, "tokens"):
@@ -288,22 +279,18 @@ class ReactLoop(Loop):
         u = response.token_usage
         total_input += u.input_tokens
         total_output += u.output_tokens
-        pricing = getattr(agent._model, "pricing", None) if agent._model else None
-        from syrin.cost import calculate_cost
-        from syrin.types import TokenUsage
 
-        # Calculate cost using ACCUMULATED tokens, not just the last response
         total_cost = calculate_cost(
-            agent._model_config.model_id,
+            ctx.model_id,
             TokenUsage(
                 input_tokens=total_input,
                 output_tokens=total_output,
                 total_tokens=total_input + total_output,
             ),
-            pricing_override=pricing,
+            pricing_override=ctx.pricing_override,
         )
 
-        agent._emit_event(
+        ctx.emit_event(
             Hook.AGENT_RUN_END,
             EventContext(
                 content=response.content or "",
@@ -349,43 +336,39 @@ class HumanInTheLoop(Loop):
         self.approve = approve
         self.max_iterations = max_iterations
 
-    async def run(self, agent: Any, user_input: str) -> LoopResult:
+    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
         """Execute loop with human approval."""
+        from syrin.cost import calculate_cost
         from syrin.events import EventContext
-        from syrin.types import Message
+        from syrin.types import Message, TokenUsage
 
-        messages = agent._build_messages(user_input)
-        tools = agent._tools if agent._tools else None
+        messages = ctx.build_messages(user_input)
+        tools = ctx.tools
         iteration = 0
         tools_used = []
         tool_calls_all = []
         run_start = time.perf_counter()
 
-        agent._emit_event(
+        ctx.emit_event(
             Hook.AGENT_RUN_START,
             EventContext(
                 input=user_input,
-                model=agent._model_config.model_id,
+                model=ctx.model_id,
                 iteration=0,
             ),
         )
 
         while iteration < self.max_iterations:
             iteration += 1
-            agent._check_and_apply_rate_limit()
-            _max_ot = (
-                (getattr(agent._model, "metadata", None) or {}).get("max_output_tokens", 1024)
-                if getattr(agent, "_model", None)
-                else 1024
-            )
-            agent._pre_call_budget_check(messages, max_output_tokens=_max_ot)
+            ctx.check_and_apply_rate_limit()
+            ctx.pre_call_budget_check(messages, max_output_tokens=ctx.max_output_tokens)
 
-            response = await agent.complete(messages, tools)
+            response = await ctx.complete(messages, tools)
 
-            if agent._rate_limit_manager_internal is not None:
-                agent._record_rate_limit_usage(response.token_usage)
-            if agent._budget is not None:
-                agent._record_cost(response.token_usage, agent._model_config.model_id)
+            if ctx.has_rate_limit:
+                ctx.record_rate_limit_usage(response.token_usage)
+            if ctx.has_budget:
+                ctx.record_cost(response.token_usage, ctx.model_id)
 
             if not response.tool_calls:
                 break
@@ -406,7 +389,7 @@ class HumanInTheLoop(Loop):
                 if self.approve:
                     approved = await self.approve(tool_name, tool_args)
 
-                agent._emit_event(
+                ctx.emit_event(
                     Hook.TOOL_CALL_START,
                     EventContext(
                         name=tool_name,
@@ -436,7 +419,7 @@ class HumanInTheLoop(Loop):
                 )
 
                 try:
-                    result = await agent.execute_tool(tool_name, tool_args)
+                    result = await ctx.execute_tool(tool_name, tool_args)
                     messages.append(
                         Message(
                             role=MessageRole.TOOL,
@@ -458,22 +441,18 @@ class HumanInTheLoop(Loop):
         u = response.token_usage
         total_input = u.input_tokens
         total_output = u.output_tokens
-        pricing = getattr(agent._model, "pricing", None) if agent._model else None
-        from syrin.cost import calculate_cost
-        from syrin.types import TokenUsage
 
-        # Calculate cost using all accumulated tokens
         total_cost = calculate_cost(
-            agent._model_config.model_id,
+            ctx.model_id,
             TokenUsage(
                 input_tokens=total_input,
                 output_tokens=total_output,
                 total_tokens=total_input + total_output,
             ),
-            pricing_override=pricing,
+            pricing_override=ctx.pricing_override,
         )
 
-        agent._emit_event(
+        ctx.emit_event(
             Hook.AGENT_RUN_END,
             EventContext(
                 content=response.content or "",
@@ -518,25 +497,26 @@ class PlanExecuteLoop(Loop):
         self.max_plan_iterations = max_plan_iterations
         self.max_execution_iterations = max_execution_iterations
 
-    async def run(self, agent: Any, user_input: str) -> LoopResult:
+    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
         """Execute PLAN → EXECUTE → REVIEW loop."""
+        from syrin.cost import calculate_cost
         from syrin.events import EventContext
         from syrin.types import Message, TokenUsage
 
-        messages = agent._build_messages(
+        messages = ctx.build_messages(
             user_input
             + "\n\nPlease provide a detailed plan with numbered steps to accomplish this task."
         )
-        tools = agent._tools if agent._tools else None
+        tools = ctx.tools
         run_start = time.perf_counter()
         total_input = 0
         total_output = 0
 
-        agent._emit_event(
+        ctx.emit_event(
             Hook.AGENT_RUN_START,
             EventContext(
                 input=user_input,
-                model=agent._model_config.model_id,
+                model=ctx.model_id,
                 iteration=0,
             ),
         )
@@ -547,21 +527,16 @@ class PlanExecuteLoop(Loop):
 
         while plan_iteration < self.max_plan_iterations:
             plan_iteration += 1
-            agent._check_and_apply_rate_limit()
-            _max_ot = (
-                (getattr(agent._model, "metadata", None) or {}).get("max_output_tokens", 1024)
-                if getattr(agent, "_model", None)
-                else 1024
-            )
-            agent._pre_call_budget_check(messages, max_output_tokens=_max_ot)
-            agent._emit_event(Hook.LLM_REQUEST_START, EventContext(iteration=plan_iteration))
+            ctx.check_and_apply_rate_limit()
+            ctx.pre_call_budget_check(messages, max_output_tokens=ctx.max_output_tokens)
+            ctx.emit_event(Hook.LLM_REQUEST_START, EventContext(iteration=plan_iteration))
 
-            response = await agent.complete(messages, tools)
+            response = await ctx.complete(messages, tools)
 
-            if agent._rate_limit_manager_internal is not None:
-                agent._record_rate_limit_usage(response.token_usage)
-            if agent._budget is not None:
-                agent._record_cost(response.token_usage, agent._model_config.model_id)
+            if ctx.has_rate_limit:
+                ctx.record_rate_limit_usage(response.token_usage)
+            if ctx.has_budget:
+                ctx.record_cost(response.token_usage, ctx.model_id)
 
             u = response.token_usage
             total_input += u.input_tokens
@@ -576,7 +551,7 @@ class PlanExecuteLoop(Loop):
                             tool_calls=response.tool_calls,
                         )
                     )
-                    tool_result = await agent.execute_tool(tc.name, tc.arguments or {})
+                    tool_result = await ctx.execute_tool(tc.name, tc.arguments or {})
                     messages.append(
                         Message(
                             role=MessageRole.TOOL,
@@ -588,7 +563,7 @@ class PlanExecuteLoop(Loop):
                 plan_response = response
                 break
 
-            agent._emit_event(Hook.LLM_REQUEST_END, EventContext(iteration=plan_iteration))
+            ctx.emit_event(Hook.LLM_REQUEST_END, EventContext(iteration=plan_iteration))
 
         if plan_response is None:
             plan_response = response
@@ -606,24 +581,19 @@ class PlanExecuteLoop(Loop):
 
         while exec_iteration < self.max_execution_iterations:
             exec_iteration += 1
-            agent._check_and_apply_budget()
-            agent._check_and_apply_rate_limit()
-            _max_ot = (
-                (getattr(agent._model, "metadata", None) or {}).get("max_output_tokens", 1024)
-                if getattr(agent, "_model", None)
-                else 1024
-            )
-            agent._pre_call_budget_check(messages, max_output_tokens=_max_ot)
-            agent._emit_event(
+            ctx.check_and_apply_budget()
+            ctx.check_and_apply_rate_limit()
+            ctx.pre_call_budget_check(messages, max_output_tokens=ctx.max_output_tokens)
+            ctx.emit_event(
                 Hook.LLM_REQUEST_START, EventContext(iteration=plan_iteration + exec_iteration)
             )
 
-            response = await agent.complete(messages, tools)
+            response = await ctx.complete(messages, tools)
 
-            if agent._rate_limit_manager_internal is not None:
-                agent._record_rate_limit_usage(response.token_usage)
-            if agent._budget is not None:
-                agent._record_cost(response.token_usage, agent._model_config.model_id)
+            if ctx.has_rate_limit:
+                ctx.record_rate_limit_usage(response.token_usage)
+            if ctx.has_budget:
+                ctx.record_cost(response.token_usage, ctx.model_id)
 
             u = response.token_usage
             total_input += u.input_tokens
@@ -642,7 +612,7 @@ class PlanExecuteLoop(Loop):
             )
 
             for tc in response.tool_calls:
-                tool_result = await agent.execute_tool(tc.name, tc.arguments or {})
+                tool_result = await ctx.execute_tool(tc.name, tc.arguments or {})
                 messages.append(
                     Message(
                         role=MessageRole.TOOL,
@@ -651,7 +621,7 @@ class PlanExecuteLoop(Loop):
                     )
                 )
 
-            agent._emit_event(
+            ctx.emit_event(
                 Hook.LLM_REQUEST_END, EventContext(iteration=plan_iteration + exec_iteration)
             )
 
@@ -660,20 +630,17 @@ class PlanExecuteLoop(Loop):
 
         latency_ms = (time.perf_counter() - run_start) * 1000
 
-        pricing = getattr(agent._model, "pricing", None) if agent._model else None
-        from syrin.cost import calculate_cost
-
         total_cost = calculate_cost(
-            agent._model_config.model_id,
+            ctx.model_id,
             TokenUsage(
                 input_tokens=total_input,
                 output_tokens=total_output,
                 total_tokens=total_input + total_output,
             ),
-            pricing_override=pricing,
+            pricing_override=ctx.pricing_override,
         )
 
-        agent._emit_event(
+        ctx.emit_event(
             Hook.AGENT_RUN_END,
             EventContext(
                 content=final_response.content or "",
@@ -717,10 +684,11 @@ class CodeActionLoop(Loop):
         self.max_iterations = max_iterations
         self.timeout_seconds = timeout_seconds
 
-    async def run(self, agent: Any, user_input: str) -> LoopResult:
+    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
         """Execute CODE → EXECUTE → INTERPRET loop."""
         import re
 
+        from syrin.cost import calculate_cost
         from syrin.events import EventContext
         from syrin.types import Message, TokenUsage
 
@@ -741,41 +709,34 @@ class CodeActionLoop(Loop):
         total_input = 0
         total_output = 0
 
-        agent._emit_event(
+        ctx.emit_event(
             Hook.AGENT_RUN_START,
             EventContext(
                 input=user_input,
-                model=agent._model_config.model_id,
+                model=ctx.model_id,
                 iteration=0,
             ),
         )
 
-        code_output = None
-
         while iteration < self.max_iterations:
             iteration += 1
-            agent._check_and_apply_budget()
-            agent._check_and_apply_rate_limit()
-            _max_ot = (
-                (getattr(agent._model, "metadata", None) or {}).get("max_output_tokens", 1024)
-                if getattr(agent, "_model", None)
-                else 1024
-            )
-            agent._pre_call_budget_check(messages, max_output_tokens=_max_ot)
-            agent._emit_event(Hook.LLM_REQUEST_START, EventContext(iteration=iteration))
+            ctx.check_and_apply_budget()
+            ctx.check_and_apply_rate_limit()
+            ctx.pre_call_budget_check(messages, max_output_tokens=ctx.max_output_tokens)
+            ctx.emit_event(Hook.LLM_REQUEST_START, EventContext(iteration=iteration))
 
-            response = await agent.complete(messages, tools)
+            response = await ctx.complete(messages, tools)
 
-            if agent._rate_limit_manager_internal is not None:
-                agent._record_rate_limit_usage(response.token_usage)
-            if agent._budget is not None:
-                agent._record_cost(response.token_usage, agent._model_config.model_id)
+            if ctx.has_rate_limit:
+                ctx.record_rate_limit_usage(response.token_usage)
+            if ctx.has_budget:
+                ctx.record_cost(response.token_usage, ctx.model_id)
 
             u = response.token_usage
             total_input += u.input_tokens
             total_output += u.output_tokens
 
-            agent._emit_event(
+            ctx.emit_event(
                 Hook.LLM_REQUEST_END,
                 EventContext(
                     content=response.content or "",
@@ -831,20 +792,17 @@ class CodeActionLoop(Loop):
 
         latency_ms = (time.perf_counter() - run_start) * 1000
 
-        pricing = getattr(agent._model, "pricing", None) if agent._model else None
-        from syrin.cost import calculate_cost
-
         total_cost = calculate_cost(
-            agent._model_config.model_id,
+            ctx.model_id,
             TokenUsage(
                 input_tokens=total_input,
                 output_tokens=total_output,
                 total_tokens=total_input + total_output,
             ),
-            pricing_override=pricing,
+            pricing_override=ctx.pricing_override,
         )
 
-        agent._emit_event(
+        ctx.emit_event(
             Hook.AGENT_RUN_END,
             EventContext(
                 content=response.content or "",

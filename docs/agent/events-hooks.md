@@ -132,5 +132,6 @@ agent = Agent(model=model, debug=True)
 
 ## See Also
 
+- [Event Bus](../event-bus.md) — Typed domain events for metrics and observability
 - [Advanced Topics: Lifecycle Hooks](../advanced-topics.md)
 - [Observability](../observability.md)

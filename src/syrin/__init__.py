@@ -48,7 +48,6 @@ from syrin.budget import (
     BudgetLimitType,
     BudgetThreshold,
     RateLimit,
-    Threshold,
     TokenLimits,
     TokenRateLimit,
     raise_on_exceeded,
@@ -75,13 +74,16 @@ from syrin.cli import (
 from syrin.config import configure, get_config
 from syrin.context import (
     Context,
-    ContextBudget,
     ContextManager,
     ContextStats,
     DefaultContextManager,
-    TokenBudget,
     TokenCounter,
-    WindowCapacity,
+)
+from syrin.domain_events import (
+    BudgetThresholdReached,
+    ContextCompacted,
+    DomainEvent,
+    EventBus,
 )
 from syrin.enums import (
     AuditBackend,
@@ -116,7 +118,7 @@ from syrin.enums import (
 from syrin.events import EventContext, Events
 from syrin.exceptions import ValidationError
 from syrin.guardrails import (
-    BlockedWordsGuardrail,
+    ContentFilter,
     Guardrail,
     GuardrailChain,
     GuardrailResult,
@@ -221,7 +223,6 @@ from syrin.threshold import (
     ContextThreshold,
     RateLimitThreshold,
     ThresholdContext,
-    ThresholdEvent,
     compact_if_available,
 )
 from syrin.tool import tool
@@ -276,8 +277,19 @@ def run(
         else:
             model_obj = ModelClass(provider="litellm", model_id="gpt-4o")
     elif isinstance(model, str):
+        import os
+
         provider = _detect_provider(model)
-        model_obj = ModelClass(provider=provider, model_id=model)
+        api_key = None
+        if provider == "openai":
+            api_key = os.getenv("OPENAI_API_KEY") or get_config().default_api_key
+        elif provider == "anthropic":
+            api_key = os.getenv("ANTHROPIC_API_KEY") or get_config().default_api_key
+        elif provider == "google":
+            api_key = os.getenv("GOOGLE_API_KEY") or get_config().default_api_key
+        else:
+            api_key = get_config().default_api_key or os.getenv("OPENAI_API_KEY")
+        model_obj = ModelClass(provider=provider, model_id=model, api_key=api_key)
     else:
         model_obj = model
 
@@ -332,7 +344,6 @@ __all__ = [
     "RateLimit",
     "TokenLimits",
     "TokenRateLimit",
-    "Threshold",
     "BudgetThreshold",
     "raise_on_exceeded",
     "stop_on_exceeded",
@@ -344,7 +355,6 @@ __all__ = [
     # Threshold
     # =============================================================================
     "ThresholdContext",
-    "ThresholdEvent",
     "BudgetThreshold",
     "ContextThreshold",
     "compact_if_available",
@@ -363,12 +373,9 @@ __all__ = [
     # =============================================================================
     "Context",
     "ContextStats",
-    "ContextBudget",
-    "TokenBudget",
     "ContextManager",
     "DefaultContextManager",
     "TokenCounter",
-    "WindowCapacity",
     # =============================================================================
     # Pipeline
     # =============================================================================
@@ -486,9 +493,13 @@ __all__ = [
     "CheckpointConfig",
     "CheckpointState",
     "CheckpointTrigger",
+    "BudgetThresholdReached",
+    "ContextCompacted",
+    "DomainEvent",
+    "EventBus",
+    "ContentFilter",
     "Guardrail",
     "GuardrailChain",
     "GuardrailResult",
-    "BlockedWordsGuardrail",
     "LengthGuardrail",
 ]
