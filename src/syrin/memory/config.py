@@ -163,7 +163,11 @@ class Memory(BaseModel):
     auto_extract: bool = True
     extraction_model: str | None = None
 
-    top_k: int = Field(10, gt=0)
+    top_k: int = Field(
+        10,
+        gt=0,
+        description="Number of top memories to recall. Must be int >= 1. Pydantic coerces numeric strings.",
+    )
     relevance_threshold: float = Field(0.7, ge=0.0, le=1.0)
     injection_strategy: InjectionStrategy = InjectionStrategy.ATTENTION_OPTIMIZED
 

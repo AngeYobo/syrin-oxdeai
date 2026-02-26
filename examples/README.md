@@ -2,6 +2,10 @@
 
 This directory contains example scripts showing how to use the Syrin library.
 
+## Get started quickly — one notebook
+
+**[`getting_started.ipynb`](getting_started.ipynb)** — A single Jupyter notebook with **all topics**: markdown docs, runnable code, and output. Uses Almock (no API key). Sections: Minimal → Tasks → Budget (with thresholds) → Memory → Tools → Loops → Multi-agent → Streaming → Guardrails → Observability (trace/debug) → Context → Checkpoints → Models → Prompts → Advanced, plus a **real-world** section (budget + threshold + `debug=True`). Share this file with anyone who wants to get started quickly.
+
 ## Core Examples
 
 - **hello_model.py** — Create a `Model` and inspect config (no API key).

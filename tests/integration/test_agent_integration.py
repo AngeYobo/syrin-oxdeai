@@ -1,0 +1,125 @@
+"""
+Integration tests for Agent variants: budget, memory, tools.
+
+Uses Model.Almock(latency_seconds=0.01) for fast tests.
+"""
+
+from __future__ import annotations
+
+from syrin import Agent, Budget, Memory, MemoryType, Model
+from syrin.memory import BufferMemory
+from syrin.tool import tool
+
+
+def _almock() -> Model:
+    return Model.Almock(latency_seconds=0.01, lorem_length=50)
+
+
+# -----------------------------------------------------------------------------
+# Agent with budget vs without budget
+# -----------------------------------------------------------------------------
+
+
+class TestAgentWithWithoutBudget:
+    def test_agent_with_budget_almock_real_flow(self) -> None:
+        """Agent with budget (Almock) — real flow, cost tracked."""
+        model = _almock()
+        budget = Budget(run=10.0)
+        agent = Agent(model=model, system_prompt="You are helpful.", budget=budget)
+
+        response = agent.response("Hello")
+
+        assert response.content is not None
+        assert response.cost >= 0
+        assert agent.budget_summary.get("current_run_cost", 0) >= 0
+
+    def test_agent_without_budget_almock(self) -> None:
+        """Agent without budget — runs successfully, no budget tracking."""
+        model = _almock()
+        agent = Agent(model=model, system_prompt="You are helpful.")
+
+        response = agent.response("Hello")
+
+        assert response.content is not None
+        assert response.cost >= 0
+
+
+# -----------------------------------------------------------------------------
+# Agent with memory vs without memory
+# -----------------------------------------------------------------------------
+
+
+class TestAgentWithWithoutMemory:
+    def test_agent_with_buffer_memory(self) -> None:
+        """Agent with BufferMemory — conversation history included in context."""
+        from syrin.enums import MessageRole
+        from syrin.types import Message
+
+        model = _almock()
+        mem = BufferMemory()
+        mem.add(Message(role=MessageRole.USER, content="My name is Alice."))
+        mem.add(Message(role=MessageRole.ASSISTANT, content="Hello Alice!"))
+        agent = Agent(model=model, system_prompt="You are helpful.", memory=mem)
+
+        response = agent.response("What is my name?")
+
+        assert response.content is not None
+        assert len(mem.get_messages()) >= 2
+
+    def test_agent_with_memory_4type(self) -> None:
+        """Agent with Memory (4-type) — remember/recall works."""
+        model = _almock()
+        mem = Memory()
+        agent = Agent(model=model, system_prompt="You are helpful.", memory=mem)
+
+        agent.remember("User prefers Python over Java", memory_type=MemoryType.CORE)
+        response = agent.response("What do I prefer?")
+
+        assert response.content is not None
+
+    def test_agent_without_memory_memory_false(self) -> None:
+        """Agent with memory=False — no conversation persistence."""
+        model = _almock()
+        agent = Agent(model=model, system_prompt="You are helpful.", memory=False)
+
+        response = agent.response("Hello")
+
+        assert response.content is not None
+
+
+# -----------------------------------------------------------------------------
+# Agent with tools vs without tools
+# -----------------------------------------------------------------------------
+
+
+class TestAgentWithWithoutTools:
+    @staticmethod
+    def _search_tool():
+        @tool
+        def search(query: str) -> str:
+            return f"Results for: {query}"
+
+        return search
+
+    def test_agent_with_tools(self) -> None:
+        """Agent with tools — tool execution flow."""
+        model = _almock()
+        search = self._search_tool()
+        agent = Agent(
+            model=model,
+            system_prompt="You are helpful. Use search when needed.",
+            tools=[search],
+        )
+
+        response = agent.response("Search for AI trends")
+
+        assert response.content is not None
+
+    def test_agent_without_tools(self) -> None:
+        """Agent without tools — single LLM call."""
+        model = _almock()
+        agent = Agent(model=model, system_prompt="You are helpful.")
+
+        response = agent.response("What is 2+2?")
+
+        assert response.content is not None

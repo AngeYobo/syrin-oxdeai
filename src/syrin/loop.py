@@ -219,6 +219,11 @@ class ReactLoop(Loop):
     name = "react"
 
     def __init__(self, max_iterations: int = 10):
+        if not isinstance(max_iterations, int) or max_iterations < 1:
+            raise ValueError(
+                f"max_iterations must be int >= 1, got {max_iterations!r}. "
+                "Use at least 1 to allow at least one LLM call."
+            )
         self.max_iterations = max_iterations
 
     async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:

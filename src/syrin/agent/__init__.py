@@ -113,6 +113,13 @@ def _merge_class_attrs(mro: tuple[type, ...], name: str, merge: bool) -> Any:
     return _UNSET
 
 
+def _validate_user_input(user_input: str | None, method: str = "response") -> None:
+    """Raise TypeError if user_input is not str."""
+    if not isinstance(user_input, str):
+        got = type(user_input).__name__ if user_input is not None else "NoneType"
+        raise TypeError(f'user_input must be str, got {got}. Example: agent.{method}("Hello")')
+
+
 def _resolve_provider(model: Model | None, model_config: ModelConfig) -> Provider:
     """Resolve Provider from Model (preferred) or ModelConfig.provider via registry.
 
@@ -217,7 +224,7 @@ class Agent:
         max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
         budget_store: BudgetStore | None = None,
         budget_store_key: str = "default",
-        memory: ConversationMemory | Memory | None = None,
+        memory: ConversationMemory | Memory | bool | None = None,
         loop_strategy: LoopStrategy = LoopStrategy.REACT,
         loop: Loop | type[Loop] | None = None,
         guardrails: list[Guardrail] | GuardrailChain | None = _UNSET,
@@ -286,8 +293,50 @@ class Agent:
             budget = getattr(cls, "_Syrin_default_budget", None)
         if guardrails is _UNSET:
             guardrails = getattr(cls, "_Syrin_default_guardrails", None) or []
+        if not isinstance(max_tool_iterations, int):
+            raise TypeError(
+                f"max_tool_iterations must be int, got {type(max_tool_iterations).__name__}. "
+                "Example: max_tool_iterations=10"
+            )
+        if max_tool_iterations < 1:
+            raise ValueError(
+                f"max_tool_iterations must be >= 1, got {max_tool_iterations}. "
+                "Use at least 1 to allow at least one LLM call."
+            )
+        if system_prompt is not None and not isinstance(system_prompt, str):
+            raise TypeError(
+                f"system_prompt must be str, got {type(system_prompt).__name__}. "
+                "Example: system_prompt='You are a helpful assistant.'"
+            )
+        if tools is not None and not isinstance(tools, list):
+            raise TypeError(
+                f"tools must be list of ToolSpec or None, got {type(tools).__name__}. "
+                "Use @syrin.tool or syrin.tool() to create tools."
+            )
+        tools_list = tools if isinstance(tools, list) else []
+        for i, t in enumerate(tools_list):
+            if t is None:
+                raise TypeError(
+                    "tools must not contain None. "
+                    "Use list of ToolSpec (from @syrin.tool or syrin.tool())."
+                )
+            if not isinstance(t, ToolSpec):
+                raise TypeError(
+                    f"tools[{i}] must be ToolSpec, got {type(t).__name__}. "
+                    "Use @syrin.tool or syrin.tool() to create tools."
+                )
+        if budget is not None and not isinstance(budget, Budget):
+            raise TypeError(
+                f"budget must be Budget, got {type(budget).__name__}. "
+                "Use Budget(run=1.0, per=...) for cost limits."
+            )
         if model is None:
             raise TypeError("Agent requires model (pass explicitly or set class-level model)")
+        if not isinstance(model, (Model, ModelConfig)):
+            raise TypeError(
+                f"model must be Model or ModelConfig, got {type(model).__name__}. "
+                "Use Model.OpenAI(), Model.Anthropic(), Model.Almock(), etc."
+            )
         if isinstance(model, Model):
             self._model: Model | None = model
             self._model_config = model.to_config()
@@ -324,6 +373,15 @@ class Agent:
         ctx_config = getattr(self._context, "context", None)
         self._token_limits = getattr(ctx_config, "budget", None) if ctx_config else None
 
+        if (
+            memory is not None
+            and memory is not False
+            and not isinstance(memory, (Memory, ConversationMemory))
+        ):
+            raise TypeError(
+                f"memory must be Memory, ConversationMemory, False, or None, got {type(memory).__name__}. "
+                "Use Memory(types=[...], top_k=10), BufferMemory(), or False to disable."
+            )
         if memory is None:
             # Default: enable persistent memory with sensible defaults
             self._persistent_memory = Memory(
@@ -331,6 +389,11 @@ class Agent:
                 top_k=10,
             )
             self._memory_backend = get_backend(MemoryBackend.MEMORY)
+        elif memory is False:
+            # Explicitly disable persistent memory
+            self._persistent_memory = None
+            self._memory_backend = None
+            self._conversation_memory = None
         elif isinstance(memory, Memory):
             self._persistent_memory = memory
             self._memory_backend = get_backend(memory.backend, path=memory.path)
@@ -1758,8 +1821,11 @@ class Agent:
         self, messages: list[Message], tools: list[ToolSpec] | None
     ) -> ProviderResponse:
         """Async internal method to call provider."""
+        provider_kwargs: dict[str, Any] = {}
+        if self._model is not None and hasattr(self._model, "_provider_kwargs"):
+            provider_kwargs = dict(getattr(self._model, "_provider_kwargs", {}))
         return await self._provider.complete(
-            messages=messages, model=self._model_config, tools=tools
+            messages=messages, model=self._model_config, tools=tools, **provider_kwargs
         )
 
     async def complete(
@@ -1877,6 +1943,7 @@ class Agent:
             >>> r = agent.response("What is 2+2?")
             >>> r = agent.response("Long task...", context=Context(max_tokens=4000))
         """
+        _validate_user_input(user_input, "response")
         self._call_context = context
         try:
             self._run_report = AgentReport()
@@ -1913,6 +1980,7 @@ class Agent:
         Example:
             >>> r = await agent.arun("Summarize this")
         """
+        _validate_user_input(user_input, "arun")
         self._call_context = context
         try:
             self._run_report = AgentReport()
@@ -1953,6 +2021,7 @@ class Agent:
             >>> for chunk in agent.stream("Write a poem"):
             ...     print(chunk.text, end="")
         """
+        _validate_user_input(user_input, "stream")
         self._call_context = context
         try:
             if self._budget is not None or self._token_limits is not None:
@@ -1982,6 +2051,7 @@ class Agent:
             >>> async for chunk in agent.astream("Write a poem"):
             ...     print(chunk.text, end="")
         """
+        _validate_user_input(user_input, "astream")
         self._call_context = context
         try:
             if self._budget is not None or self._token_limits is not None:

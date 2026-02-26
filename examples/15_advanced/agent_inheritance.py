@@ -1,0 +1,79 @@
+"""Agent Inheritance Example.
+
+Demonstrates:
+- Creating agent classes with Python inheritance
+- Tool merging from parent classes
+- Overriding system prompts and budgets
+- Multi-level inheritance
+
+Run: python -m examples.15_advanced.agent_inheritance
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+from examples.models.models import almock
+from syrin import Agent, Budget, tool, warn_on_exceeded
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+
+# 1. Basic inheritance
+@tool
+def repeat(text: str, count: int = 1) -> str:
+    """Repeat text count times."""
+    return " ".join([text] * count)
+
+class BaseAgent(Agent):
+    model = almock
+    system_prompt = "You are a helpful assistant."
+    tools = [repeat]
+
+class SpecializedAgent(BaseAgent):
+    system_prompt = "You are a specialized assistant."
+
+base = BaseAgent()
+specialized = SpecializedAgent()
+result = specialized.response("Say hello")
+print(f"Specialized tools: {[t.name for t in specialized._tools]}, response: {result.content[:60]}...")
+
+# 2. Adding tools in child
+@tool
+def greet(name: str) -> str:
+    """Greet someone."""
+    return f"Hello, {name}!"
+
+class GreetingAgent(BaseAgent):
+    tools = [repeat, greet]
+
+agent = GreetingAgent()
+print(f"GreetingAgent tools: {[t.name for t in agent._tools]}")
+
+# 3. Budget override
+class BudgetBase(Agent):
+    model = almock
+    budget = Budget(run=10.0, on_exceeded=warn_on_exceeded)
+
+class TightBudgetAgent(BudgetBase):
+    budget = Budget(run=0.10, on_exceeded=warn_on_exceeded)
+
+base = BudgetBase()
+tight = TightBudgetAgent()
+
+# 4. Multi-level inheritance
+class Level1(Agent):
+    model = almock
+    system_prompt = "Level 1 base."
+
+class Level2(Level1):
+    system_prompt = "Level 2 specialized."
+
+class Level3(Level2):
+    system_prompt = "Level 3 highly specialized."
+
+for cls in [Level1, Level2, Level3]:
+    agent = cls()
+    print(f"{cls.__name__}: {agent._system_prompt}")

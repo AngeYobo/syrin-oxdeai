@@ -217,7 +217,11 @@ class Budget(BaseModel):
 
     model_config = {"str_strip_whitespace": True, "arbitrary_types_allowed": True}
 
-    run: float | None = Field(default=None, ge=0, description="Max cost per run (USD)")
+    run: float | None = Field(
+        default=None,
+        ge=0,
+        description="Max cost per run (USD). Pydantic coerces numeric strings (e.g. '0.50') to float.",
+    )
     reserve: float = Field(
         default=0, ge=0, description="Amount to reserve; effective run limit is run - reserve."
     )
