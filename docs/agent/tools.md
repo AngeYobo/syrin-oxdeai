@@ -43,7 +43,7 @@ agent = Agent(
 
 ## ToolSpec
 
-Each tool is represented as a `ToolSpec` with:
+Import from `syrin.tool`: `from syrin.tool import ToolSpec` (or `from syrin import ToolSpec`). Each tool is represented as a `ToolSpec` with:
 
 - `name` — Tool name (from function name).
 - `parameters` — JSON schema for arguments.

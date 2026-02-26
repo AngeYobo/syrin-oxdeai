@@ -120,10 +120,20 @@ pipeline = DynamicPipeline(
     max_parallel=4,
 )
 debugger = PipelineDebugger(verbose=True)
-pipeline.events.on(Hook.DYNAMIC_PIPELINE_START, lambda ctx: debugger.log(Hook.DYNAMIC_PIPELINE_START, ctx))
-pipeline.events.on(Hook.DYNAMIC_PIPELINE_AGENT_SPAWN, lambda ctx: debugger.log(Hook.DYNAMIC_PIPELINE_AGENT_SPAWN, ctx))
-pipeline.events.on(Hook.DYNAMIC_PIPELINE_AGENT_COMPLETE, lambda ctx: debugger.log(Hook.DYNAMIC_PIPELINE_AGENT_COMPLETE, ctx))
-pipeline.events.on(Hook.DYNAMIC_PIPELINE_END, lambda ctx: debugger.log(Hook.DYNAMIC_PIPELINE_END, ctx))
+pipeline.events.on(
+    Hook.DYNAMIC_PIPELINE_START, lambda ctx: debugger.log(Hook.DYNAMIC_PIPELINE_START, ctx)
+)
+pipeline.events.on(
+    Hook.DYNAMIC_PIPELINE_AGENT_SPAWN,
+    lambda ctx: debugger.log(Hook.DYNAMIC_PIPELINE_AGENT_SPAWN, ctx),
+)
+pipeline.events.on(
+    Hook.DYNAMIC_PIPELINE_AGENT_COMPLETE,
+    lambda ctx: debugger.log(Hook.DYNAMIC_PIPELINE_AGENT_COMPLETE, ctx),
+)
+pipeline.events.on(
+    Hook.DYNAMIC_PIPELINE_END, lambda ctx: debugger.log(Hook.DYNAMIC_PIPELINE_END, ctx)
+)
 task = "Conduct market research on AI in Healthcare. Provide a consolidated report."
 start = time.time()
 result = pipeline.run(task, mode="parallel")

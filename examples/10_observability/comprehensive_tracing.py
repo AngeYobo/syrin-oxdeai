@@ -41,10 +41,12 @@ for q in ["What is AI?", "What is ML?", "What is DL?"]:
 print(f"Total steps: {total_steps}, latency: {total_latency:.1f}ms")
 print(f"Budget summary: {agent.budget_summary}")
 
+
 # 3. Debug mode
 class DebugAgent(Agent):
     model = almock
     debug = True
+
 
 agent = DebugAgent()
 result = agent.response("Hello debug!")

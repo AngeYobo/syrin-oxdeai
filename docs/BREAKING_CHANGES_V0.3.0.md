@@ -50,7 +50,7 @@
 ## Migration
 
 - Use `Model` or `ModelConfig` for `model`; `Memory` or `ConversationMemory` for `memory`; `Budget` for `budget`.
-- Use `@syrin.tool` / `syrin.tool()` for tools; pass a list of `ToolSpec` or `None`.
+- Use `@syrin.tool` / `syrin.tool()` for tools; pass a list of `ToolSpec` or `None`. Import `ToolSpec` from `syrin.tool` (or `syrin`), not from `syrin.types`.
 - Ensure `max_tool_iterations` is an `int` >= 1.
 - Ensure `user_input` to `response()`, `arun()`, etc. is a `str`.
 - Use `max_iterations >= 1` for `ReactLoop` (and equivalent for other loops).

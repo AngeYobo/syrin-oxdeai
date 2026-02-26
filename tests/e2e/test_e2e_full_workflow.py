@@ -270,9 +270,7 @@ class TestAgentWithTokenLimits:
         agent = Agent(
             model=_almock(),
             budget=Budget(run=100.0, on_exceeded=raise_on_exceeded),
-            context=Context(
-                budget=TokenLimits(run=1, on_exceeded=raise_on_exceeded)
-            ),
+            context=Context(budget=TokenLimits(run=1, on_exceeded=raise_on_exceeded)),
         )
         with pytest.raises(BudgetExceededError) as exc:
             agent.response("Hello")
@@ -398,8 +396,8 @@ class TestAgentWithHooks:
     def test_on_start_and_complete_hooks(self) -> None:
         events = []
         agent = Agent(model=_almock())
-        agent.events.on(Hook.AGENT_RUN_START, lambda ctx: events.append(("start", ctx)))
-        agent.events.on(Hook.AGENT_RUN_END, lambda ctx: events.append(("end", ctx)))
+        agent.events.on(Hook.AGENT_RUN_START, lambda _: events.append(("start", ctx)))
+        agent.events.on(Hook.AGENT_RUN_END, lambda _: events.append(("end", ctx)))
         agent.response("Hello")
         assert len(events) == 2
         assert events[0][0] == "start"
@@ -408,7 +406,7 @@ class TestAgentWithHooks:
     def test_hook_receives_context_data(self) -> None:
         contexts = []
         agent = Agent(model=_almock())
-        agent.events.on(Hook.AGENT_RUN_END, lambda ctx: contexts.append(ctx))
+        agent.events.on(Hook.AGENT_RUN_END, lambda _: contexts.append(ctx))
         agent.response("Hello")
         assert len(contexts) == 1
         ctx = contexts[0]
@@ -422,7 +420,7 @@ class TestAgentWithHooks:
         agent = Agent(model=_almock())
         agent.events.before(
             Hook.AGENT_RUN_START,
-            lambda ctx: (ctx.update({"custom_field": True}), modified.append(True)),
+            lambda _: (ctx.update({"custom_field": True}), modified.append(True)),
         )
         agent.response("Hello")
         assert len(modified) >= 1
@@ -430,15 +428,15 @@ class TestAgentWithHooks:
     def test_on_all_receives_every_event(self) -> None:
         all_events = []
         agent = Agent(model=_almock())
-        agent.events.on_all(lambda hook, ctx: all_events.append(hook))
+        agent.events.on_all(lambda hook, _: all_events.append(hook))
         agent.response("Hello")
         assert len(all_events) >= 2  # at least start + end
 
     def test_multiple_handlers_per_hook(self) -> None:
         counts = {"a": 0, "b": 0}
         agent = Agent(model=_almock())
-        agent.events.on(Hook.AGENT_RUN_START, lambda ctx: counts.update(a=counts["a"] + 1))
-        agent.events.on(Hook.AGENT_RUN_START, lambda ctx: counts.update(b=counts["b"] + 1))
+        agent.events.on(Hook.AGENT_RUN_START, lambda _: counts.update(a=counts["a"] + 1))
+        agent.events.on(Hook.AGENT_RUN_START, lambda _: counts.update(b=counts["b"] + 1))
         agent.response("Hello")
         assert counts["a"] == 1
         assert counts["b"] == 1
@@ -479,10 +477,12 @@ class TestAgentWithGuardrails:
         assert r.content is not None
 
     def test_multiple_guardrails_chained(self) -> None:
-        chain = GuardrailChain([
-            ContentFilter(blocked_words=["bad"]),
-            LengthGuardrail(max_length=1000),
-        ])
+        chain = GuardrailChain(
+            [
+                ContentFilter(blocked_words=["bad"]),
+                LengthGuardrail(max_length=1000),
+            ]
+        )
         agent = Agent(model=_almock(), guardrails=chain)
         r = agent.response("Good content")
         assert r.content is not None
@@ -524,7 +524,7 @@ class TestAgentWithObservability:
 
     def test_agent_report_populated(self) -> None:
         agent = Agent(model=_almock())
-        r = agent.response("Hello")
+        agent.response("Hello")
         report = agent.report
         assert report is not None
         assert report.tokens.total_tokens >= 0
@@ -557,8 +557,8 @@ class TestAgentWithEverything:
             context=Context(max_tokens=8000),
             guardrails=chain,
         )
-        agent.events.on(Hook.AGENT_RUN_START, lambda ctx: events_log.append("start"))
-        agent.events.on(Hook.AGENT_RUN_END, lambda ctx: events_log.append("end"))
+        agent.events.on(Hook.AGENT_RUN_START, lambda _: events_log.append("start"))
+        agent.events.on(Hook.AGENT_RUN_END, lambda _: events_log.append("end"))
 
         # Store memories
         agent.remember("User prefers concise answers", memory_type=MemoryType.CORE)

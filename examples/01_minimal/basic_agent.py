@@ -24,9 +24,11 @@ from syrin import Agent
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+
 class Assistant(Agent):
     model = almock
     system_prompt = "You are a helpful assistant."
+
 
 assistant = Assistant()
 result = assistant.response("What is 2 + 2?")

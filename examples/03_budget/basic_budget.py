@@ -41,11 +41,13 @@ try:
 except BudgetExceededError as e:
     print(f"BudgetExceededError: {e}")
 
+
 # 4. Class-level budget definition
 class CostAwareAgent(Agent):
     model = almock
     system_prompt = "You are a concise assistant."
     budget = Budget(run=1.00, on_exceeded=warn_on_exceeded)
+
 
 agent = CostAwareAgent()
 result = agent.response("Hello!")

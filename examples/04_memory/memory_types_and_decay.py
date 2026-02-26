@@ -22,7 +22,6 @@ from examples.models.models import almock
 from syrin import Agent
 from syrin.enums import DecayStrategy, MemoryBackend, MemoryType
 from syrin.memory import (
-    BACKENDS,
     CoreMemory,
     Decay,
     EpisodicMemory,

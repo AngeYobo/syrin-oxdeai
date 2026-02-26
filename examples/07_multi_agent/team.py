@@ -37,9 +37,11 @@ class Researcher(Agent):
     model = almock
     system_prompt = researcher_prompt(domain="technology")
 
+
 class Writer(Agent):
     model = almock
     system_prompt = writer_prompt(style="engaging")
+
 
 team = AgentTeam(
     agents=[Researcher(), Writer()],
@@ -49,14 +51,17 @@ result = team.run_task("Research AI trends")
 print(f"Result: {result.content[:80]}...")
 print(f"Cost: ${result.cost:.6f}")
 
+
 # 2. Agent selection
 class GeneralResearcher(Agent):
     model = almock
     system_prompt = researcher_prompt(domain="general")
 
+
 class GeneralWriter(Agent):
     model = almock
     system_prompt = writer_prompt(style="general")
+
 
 team = AgentTeam(agents=[GeneralResearcher(), GeneralWriter()])
 selected = team.select_agent("research machine learning")

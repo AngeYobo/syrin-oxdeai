@@ -63,10 +63,12 @@ configure(trace=False)
 # 8. Thread safety
 results: list[str] = []
 
+
 def update_config(value: bool, thread_id: int) -> None:
     configure(trace=value)
     config = get_config()
     results.append(f"Thread {thread_id}: trace={config.trace}")
+
 
 threads = []
 for i in range(3):

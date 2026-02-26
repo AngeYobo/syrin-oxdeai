@@ -50,6 +50,7 @@ class MathAssistant(Agent):
     system_prompt = "You are a helpful assistant. Use tools for calculations."
     tools = [calculate, get_weather]
 
+
 assistant = MathAssistant()
 result = assistant.response("What is 15 times 7?")
 print("Question: What is 15 times 7?")

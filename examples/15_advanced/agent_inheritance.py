@@ -27,18 +27,24 @@ def repeat(text: str, count: int = 1) -> str:
     """Repeat text count times."""
     return " ".join([text] * count)
 
+
 class BaseAgent(Agent):
     model = almock
     system_prompt = "You are a helpful assistant."
     tools = [repeat]
 
+
 class SpecializedAgent(BaseAgent):
     system_prompt = "You are a specialized assistant."
+
 
 base = BaseAgent()
 specialized = SpecializedAgent()
 result = specialized.response("Say hello")
-print(f"Specialized tools: {[t.name for t in specialized._tools]}, response: {result.content[:60]}...")
+print(
+    f"Specialized tools: {[t.name for t in specialized._tools]}, response: {result.content[:60]}..."
+)
+
 
 # 2. Adding tools in child
 @tool
@@ -46,33 +52,42 @@ def greet(name: str) -> str:
     """Greet someone."""
     return f"Hello, {name}!"
 
+
 class GreetingAgent(BaseAgent):
     tools = [repeat, greet]
 
+
 agent = GreetingAgent()
 print(f"GreetingAgent tools: {[t.name for t in agent._tools]}")
+
 
 # 3. Budget override
 class BudgetBase(Agent):
     model = almock
     budget = Budget(run=10.0, on_exceeded=warn_on_exceeded)
 
+
 class TightBudgetAgent(BudgetBase):
     budget = Budget(run=0.10, on_exceeded=warn_on_exceeded)
 
+
 base = BudgetBase()
 tight = TightBudgetAgent()
+
 
 # 4. Multi-level inheritance
 class Level1(Agent):
     model = almock
     system_prompt = "Level 1 base."
 
+
 class Level2(Level1):
     system_prompt = "Level 2 specialized."
 
+
 class Level3(Level2):
     system_prompt = "Level 3 highly specialized."
+
 
 for cls in [Level1, Level2, Level3]:
     agent = cls()

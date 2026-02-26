@@ -30,6 +30,7 @@ class MyCustomModel(Model):
         print(f"  Custom complete() called with {len(messages)} messages")
         return None
 
+
 model = MyCustomModel("my-model")
 print(f"Custom model: {model}, provider: {model.provider}")
 
@@ -46,14 +47,18 @@ result = agent.response("Fast response")
 
 # 4. Fallback chains
 primary = Model.Almock(latency_seconds=0.01)
-model = primary.with_fallback(Model.Almock(latency_seconds=0.01), Model.Almock(latency_seconds=0.01))
+model = primary.with_fallback(
+    Model.Almock(latency_seconds=0.01), Model.Almock(latency_seconds=0.01)
+)
 agent = Agent(model=model)
 result = agent.response("Hello with fallback!")
+
 
 # 5. Class-level model
 class MyAgent(Agent):
     model = almock
     system_prompt = "You are a specialized assistant."
+
 
 agent = MyAgent()
 result = agent.response("Hello specialized!")

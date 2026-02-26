@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from syrin.tool import tool
-from syrin.types import ToolSpec
+from syrin.tool import ToolSpec, tool
 
 
 def test_tool_decorator_without_args() -> None:

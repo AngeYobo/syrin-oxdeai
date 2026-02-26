@@ -46,6 +46,6 @@ class TriageAgent(Agent):
 
 
 agent = TriageAgent()
-result = agent.triage.func(agent, "User reports login failures after update")
+result = agent.triage("User reports login failures after update")
 print("Input: User reports login failures after update")
 print(f"Result: {result}")

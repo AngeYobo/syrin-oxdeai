@@ -7,12 +7,12 @@ import random
 from typing import Any
 
 from syrin.enums import AlmockPricing
+from syrin.tool import ToolSpec
 from syrin.types import (
     Message,
     ModelConfig,
     ProviderResponse,
     TokenUsage,
-    ToolSpec,
 )
 
 from .base import Provider

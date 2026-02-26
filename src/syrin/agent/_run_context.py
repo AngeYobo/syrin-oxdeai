@@ -18,7 +18,8 @@ from typing import Any, Protocol, cast
 # or use TYPE_CHECKING. We need it at runtime for the Protocol.
 from syrin.enums import Hook
 from syrin.events import EventContext
-from syrin.types import Message, ProviderResponse, TokenUsage, ToolSpec
+from syrin.tool import ToolSpec
+from syrin.types import Message, ProviderResponse, TokenUsage
 
 
 class AgentRunContext(Protocol):

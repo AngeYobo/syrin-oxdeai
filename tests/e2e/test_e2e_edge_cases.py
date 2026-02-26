@@ -7,7 +7,6 @@ Tests boundary conditions, invalid inputs, error recovery, and concurrent usage.
 
 from __future__ import annotations
 
-import asyncio
 import threading
 
 import pytest
@@ -16,7 +15,6 @@ from syrin import (
     Agent,
     Budget,
     ContentFilter,
-    Context,
     Decay,
     GuardrailChain,
     Hook,
@@ -24,19 +22,13 @@ from syrin import (
     Memory,
     MemoryType,
     Model,
-    RateLimit,
     ReactLoop,
-    Response,
     SingleShotLoop,
-    TokenLimits,
-    TokenRateLimit,
     raise_on_exceeded,
-    warn_on_exceeded,
 )
-from syrin.budget import BudgetTracker, stop_on_exceeded
+from syrin.budget import BudgetTracker
 from syrin.events import EventContext
-from syrin.exceptions import BudgetExceededError, BudgetThresholdError
-from syrin.memory import BufferMemory, MemoryEntry, WindowMemory
+from syrin.memory import BufferMemory, WindowMemory
 from syrin.threshold import BudgetThreshold
 from syrin.tool import tool
 
@@ -97,7 +89,7 @@ class TestBudgetEdgeCases:
         fired = []
         budget = Budget(
             run=10.0,
-            thresholds=[BudgetThreshold(at=0, action=lambda ctx: fired.append(True))],
+            thresholds=[BudgetThreshold(at=0, action=lambda _: fired.append(True))],
         )
         agent = Agent(model=_almock(), budget=budget)
         agent.response("Hello")
@@ -108,7 +100,7 @@ class TestBudgetEdgeCases:
         fired = []
         budget = Budget(
             run=10.0,
-            thresholds=[BudgetThreshold(at=100, action=lambda ctx: fired.append(True))],
+            thresholds=[BudgetThreshold(at=100, action=lambda _: fired.append(True))],
         )
         agent = Agent(model=_almock(), budget=budget)
         agent.response("Hello")
@@ -121,9 +113,9 @@ class TestBudgetEdgeCases:
         budget = Budget(
             run=10.0,
             thresholds=[
-                BudgetThreshold(at=0, action=lambda ctx: fired.append("low")),
-                BudgetThreshold(at=50, action=lambda ctx: fired.append("mid")),
-                BudgetThreshold(at=90, action=lambda ctx: fired.append("high")),
+                BudgetThreshold(at=0, action=lambda _: fired.append("low")),
+                BudgetThreshold(at=50, action=lambda _: fired.append("mid")),
+                BudgetThreshold(at=90, action=lambda _: fired.append("high")),
             ],
         )
         agent = Agent(model=_almock(), budget=budget)
@@ -136,10 +128,12 @@ class TestBudgetEdgeCases:
         tracker = BudgetTracker()
         from syrin.types import CostInfo, TokenUsage
 
-        tracker.record(CostInfo(
-            cost_usd=0.5,
-            token_usage=TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150),
-        ))
+        tracker.record(
+            CostInfo(
+                cost_usd=0.5,
+                token_usage=TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150),
+            )
+        )
         state = tracker.get_state()
         assert state["version"] == 1
         assert len(state["cost_history"]) == 1
@@ -228,19 +222,19 @@ class TestMemoryEdgeCases:
 
     def test_persistent_memory_unicode_content(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
-        mid = agent.remember("你好世界 🌍 مرحبا", memory_type=MemoryType.SEMANTIC)
+        _ = agent.remember("你好世界 🌍 مرحبا", memory_type=MemoryType.SEMANTIC)
         entries = agent.recall()
         assert any("你好" in e.content for e in entries)
 
     def test_persistent_memory_empty_content(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
-        mid = agent.remember("", memory_type=MemoryType.EPISODIC)
+        _ = agent.remember("", memory_type=MemoryType.EPISODIC)
         assert isinstance(mid, str)
 
     def test_persistent_memory_very_long_content(self) -> None:
         agent = Agent(model=_almock(), memory=Memory())
         long_content = "x" * 100000
-        mid = agent.remember(long_content, memory_type=MemoryType.SEMANTIC)
+        _ = agent.remember(long_content, memory_type=MemoryType.SEMANTIC)
         entries = agent.recall()
         assert len(entries) == 1
         assert len(entries[0].content) == 100000
@@ -357,7 +351,7 @@ class TestHookEdgeCases:
     def test_hook_context_is_event_context(self) -> None:
         contexts = []
         agent = Agent(model=_almock())
-        agent.events.on(Hook.AGENT_RUN_END, lambda ctx: contexts.append(ctx))
+        agent.events.on(Hook.AGENT_RUN_END, lambda _: contexts.append(ctx))
         agent.response("Hello")
         assert len(contexts) == 1
         assert isinstance(contexts[0], EventContext)
@@ -435,10 +429,12 @@ class TestConcurrentUsage:
         def record_cost():
             try:
                 for _ in range(100):
-                    tracker.record(CostInfo(
-                        cost_usd=0.001,
-                        token_usage=TokenUsage(total_tokens=10),
-                    ))
+                    tracker.record(
+                        CostInfo(
+                            cost_usd=0.001,
+                            token_usage=TokenUsage(total_tokens=10),
+                        )
+                    )
             except Exception as e:
                 errors.append(e)
 
@@ -482,9 +478,9 @@ class TestReportEdgeCases:
     def test_report_reset_between_calls(self) -> None:
         """Report resets between response() calls."""
         agent = Agent(model=_almock())
-        r1 = agent.response("First")
+        agent.response("First")
         report1_tokens = agent.report.tokens.total_tokens
-        r2 = agent.response("Second")
+        agent.response("Second")
         report2_tokens = agent.report.tokens.total_tokens
         # Reports should be independent per call
         assert report1_tokens >= 0

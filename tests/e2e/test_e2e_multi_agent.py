@@ -17,13 +17,8 @@ from syrin import (
     MemoryType,
     Model,
     Pipeline,
-    RateLimit,
     Response,
-    warn_on_exceeded,
 )
-from syrin.budget import raise_on_exceeded
-from syrin.events import EventContext
-from syrin.exceptions import BudgetExceededError
 from syrin.tool import tool
 
 
@@ -181,11 +176,13 @@ class TestSpawn:
             model = _almock()
 
         parent = Agent(model=_almock())
-        results = parent.spawn_parallel([
-            (Worker, "Task 1"),
-            (Worker, "Task 2"),
-            (Worker, "Task 3"),
-        ])
+        results = parent.spawn_parallel(
+            [
+                (Worker, "Task 1"),
+                (Worker, "Task 2"),
+                (Worker, "Task 3"),
+            ]
+        )
         assert len(results) == 3
         assert all(isinstance(r, Response) for r in results)
         assert all(r.content is not None for r in results)
@@ -209,10 +206,12 @@ class TestPipeline:
             system_prompt = "You are a writer."
 
         pipeline = Pipeline()
-        result = pipeline.run([
-            (Researcher, "Research AI trends"),
-            (Writer, "Write a summary"),
-        ]).sequential()
+        result = pipeline.run(
+            [
+                (Researcher, "Research AI trends"),
+                (Writer, "Write a summary"),
+            ]
+        ).sequential()
 
         assert isinstance(result, Response)
         assert result.content is not None
@@ -226,10 +225,12 @@ class TestPipeline:
             model = _almock()
 
         pipeline = Pipeline()
-        results = pipeline.run([
-            (Worker1, "Task A"),
-            (Worker2, "Task B"),
-        ]).parallel()
+        results = pipeline.run(
+            [
+                (Worker1, "Task A"),
+                (Worker2, "Task B"),
+            ]
+        ).parallel()
 
         assert isinstance(results, list)
         assert len(results) == 2
@@ -243,10 +244,12 @@ class TestPipeline:
             model = _almock()
 
         pipeline = Pipeline(budget=Budget(run=10.0))
-        result = pipeline.run([
-            (Step1, "Step 1"),
-            (Step2, "Step 2"),
-        ]).sequential()
+        result = pipeline.run(
+            [
+                (Step1, "Step 1"),
+                (Step2, "Step 2"),
+            ]
+        ).sequential()
         assert result.content is not None
 
     def test_empty_pipeline_returns_empty_response(self) -> None:
@@ -318,11 +321,11 @@ class TestDynamicPipeline:
         dp = DynamicPipeline(agents=[Step1, Step2], model=_almock())
         dp.events.on(
             Hook.DYNAMIC_PIPELINE_START,
-            lambda ctx: events.append("dp_start"),
+            lambda _: events.append("dp_start"),
         )
         dp.events.on(
             Hook.DYNAMIC_PIPELINE_END,
-            lambda ctx: events.append("dp_end"),
+            lambda _: events.append("dp_end"),
         )
         dp.run("Process")
         assert "dp_start" in events
@@ -341,15 +344,15 @@ class TestDynamicPipeline:
         dp = DynamicPipeline(agents=[StepA, StepB], model=_almock())
         dp.events.on(
             Hook.DYNAMIC_PIPELINE_START,
-            lambda ctx: lifecycle.append("start"),
+            lambda _: lifecycle.append("start"),
         )
         dp.events.on(
             Hook.DYNAMIC_PIPELINE_PLAN,
-            lambda ctx: lifecycle.append("plan"),
+            lambda _: lifecycle.append("plan"),
         )
         dp.events.on(
             Hook.DYNAMIC_PIPELINE_END,
-            lambda ctx: lifecycle.append("end"),
+            lambda _: lifecycle.append("end"),
         )
         dp.run("Run all")
         # START and END always fire; PLAN fires when planner returns
@@ -366,6 +369,7 @@ class TestDynamicPipeline:
 
     def test_dynamic_pipeline_requires_model(self) -> None:
         """DynamicPipeline without model raises ValueError."""
+
         class Worker(Agent):
             model = _almock()
 
@@ -397,7 +401,7 @@ class TestMultiAgentFullFeatures:
             memory=Memory(),
             budget=Budget(run=10.0, shared=True),
         )
-        source.events.on(Hook.AGENT_RUN_START, lambda ctx: events.append("source_start"))
+        source.events.on(Hook.AGENT_RUN_START, lambda _: events.append("source_start"))
 
         source.remember("User wants help with Python", memory_type=MemoryType.CORE)
         result = source.handoff(
@@ -439,9 +443,11 @@ class TestMultiAgentFullFeatures:
             model = _almock()
 
         pipeline = Pipeline(budget=Budget(run=10.0))
-        result = pipeline.run([
-            (Step1, "Step 1"),
-            (Step2, "Step 2"),
-        ]).sequential()
+        result = pipeline.run(
+            [
+                (Step1, "Step 1"),
+                (Step2, "Step 2"),
+            ]
+        ).sequential()
 
         assert result.cost >= 0

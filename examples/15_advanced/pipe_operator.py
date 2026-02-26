@@ -47,15 +47,19 @@ print(f"Pipe().then(): '{result}'")
 result = (Pipe("hello world") | add_exclamation | uppercase | add_greeting).result()
 print(f"| operator: '{result}'")
 
+
 # 4. Pipe with Agent
 class TransformAgent(Agent):
     model = almock
     system_prompt = "You are helpful."
 
+
 agent = TransformAgent()
+
 
 def process_with_agent(text: str) -> str:
     return agent.response(text).content
+
 
 result = pipe("What is Python?", process_with_agent, lambda x: x.strip()).result()
 print(f"Pipe + Agent: {result[:80]}...")
@@ -69,17 +73,21 @@ result = pipe(
 ).result()
 print(f"'{result}'")
 
+
 # 6. Async pipe
 async def async_double(x: int) -> int:
     await asyncio.sleep(0.01)
     return x * 2
 
+
 async def async_add(x: int) -> int:
     await asyncio.sleep(0.01)
     return x + 10
 
+
 async def run_async():
     return await Pipe(5).then(async_double).then(async_add).result_async()
+
 
 result = asyncio.run(run_async())
 print(f"Async: 5 → {result}")

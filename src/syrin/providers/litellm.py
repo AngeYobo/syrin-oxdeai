@@ -7,13 +7,13 @@ from typing import Any
 
 from syrin.enums import MessageRole
 from syrin.exceptions import ProviderError
+from syrin.tool import ToolSpec
 from syrin.types import (
     Message,
     ModelConfig,
     ProviderResponse,
     TokenUsage,
     ToolCall,
-    ToolSpec,
 )
 
 from .base import Provider

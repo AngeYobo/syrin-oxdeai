@@ -34,9 +34,11 @@ class Researcher(Agent):
     model = almock
     system_prompt = researcher_prompt(domain="technology")
 
+
 class Writer(Agent):
     model = almock
     system_prompt = writer_prompt(style="professional")
+
 
 pipeline = Pipeline()
 result = pipeline.run(

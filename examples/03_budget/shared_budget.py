@@ -27,9 +27,11 @@ result = parent.response("Hello from parent")
 print(f"Parent cost: ${result.cost:.6f}")
 print(f"Parent budget: {parent.budget_summary}")
 
+
 # 2. Spawn child that borrows from shared budget
 class Child(Agent):
     model = almock
+
 
 result = parent.spawn(Child, task="Do work")
 print(f"Child result: {result.content[:60]}...")

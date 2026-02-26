@@ -36,9 +36,7 @@ def test_budget_model() -> None:
 
 def test_threshold_with_callable_action() -> None:
     """BudgetThreshold accepts callable action (lambda or function) and at value."""
-    t = BudgetThreshold(
-        at=80, action=lambda ctx: None, metric=ThresholdMetric.COST
-    )
+    t = BudgetThreshold(at=80, action=lambda _: None, metric=ThresholdMetric.COST)
     assert t.at == 80
     assert callable(t.action)
 
@@ -726,7 +724,9 @@ def test_budget_tracker_concurrent_records_thread_safe() -> None:
 
     def worker() -> None:
         for _ in range(records_per_thread):
-            tracker.record(CostInfo(cost_usd=cost_per_record, token_usage=TokenUsage(total_tokens=1)))
+            tracker.record(
+                CostInfo(cost_usd=cost_per_record, token_usage=TokenUsage(total_tokens=1))
+            )
 
     threads = [threading.Thread(target=worker) for _ in range(num_threads)]
     for t in threads:

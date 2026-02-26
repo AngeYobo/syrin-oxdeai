@@ -38,7 +38,7 @@ def example_single_shot() -> None:
 
     agent = Agent(model=almock, loop=SingleShotLoop())
     result = agent.response("What is the capital of France?")
-    print(f"Q: What is the capital of France?")
+    print("Q: What is the capital of France?")
     print(f"A: {result.content[:80]}...")
 
 
@@ -49,7 +49,7 @@ def example_react() -> None:
 
     agent = Agent(model=almock, loop=ReactLoop(max_iterations=5))
     result = agent.response("What is 5 + 3?")
-    print(f"Q: What is 5 + 3?")
+    print("Q: What is 5 + 3?")
     print(f"A: {result.content[:80]}...")
 
 

@@ -20,9 +20,11 @@ from syrin.guardrails import ContentFilter, GuardrailChain
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
-chain = GuardrailChain([
-    ContentFilter(blocked_words=["spam", "scam"], name="NoSpam"),
-])
+chain = GuardrailChain(
+    [
+        ContentFilter(blocked_words=["spam", "scam"], name="NoSpam"),
+    ]
+)
 result = chain.check("Hello, legitimate message", GuardrailStage.INPUT)
 print(f"Clean text: passed={result.passed}")
 result = chain.check("This is spam", GuardrailStage.INPUT)

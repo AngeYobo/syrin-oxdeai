@@ -75,7 +75,8 @@ async def example_threshold_approval() -> None:
     from syrin.guardrails import GuardrailContext, ThresholdApproval
 
     guardrail = ThresholdApproval(
-        k=2, n=3,
+        k=2,
+        n=3,
         approvers=["alice@example.com", "bob@example.com", "charlie@example.com"],
     )
     context = GuardrailContext(

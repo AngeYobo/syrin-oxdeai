@@ -3,7 +3,7 @@
 Demonstrates:
 - TOON (Token-Oriented Object Notation) tool schema format
 - Why TOON uses ~40% fewer tokens than JSON
-- schema_to_toon, tool_schema_to_format
+- ToolSpec.schema_to_toon() and ToolSpec.to_format()
 - DocFormat.TOON vs DocFormat.JSON
 - Efficiency comparison across multiple tools
 
@@ -19,7 +19,6 @@ from dotenv import load_dotenv
 
 from syrin import tool
 from syrin.enums import DocFormat
-from syrin.tool import schema_to_toon, tool_schema_to_format
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -61,21 +60,23 @@ def send_email(to: str, subject: str, body: str, priority: str = "normal") -> st
     return f"Email sent to {to}"
 
 
-# 1. TOON vs JSON comparison
+# 1. TOON vs JSON comparison (use method on tool spec)
 tool_spec = calculate
 json_schema = json.dumps(tool_spec.parameters_schema, indent=2)
-toon_schema = schema_to_toon(tool_spec.parameters_schema)
+toon_schema = tool_spec.schema_to_toon()
 savings = ((len(json_schema) - len(toon_schema)) / len(json_schema)) * 100
-print(f"Tool: {tool_spec.name}; JSON {len(json_schema)} chars, TOON {len(toon_schema)} chars; savings {savings:.1f}%")
+print(
+    f"Tool: {tool_spec.name}; JSON {len(json_schema)} chars, TOON {len(toon_schema)} chars; savings {savings:.1f}%"
+)
 
-# 2. Format conversion
+# 2. Format conversion (use method on tool spec)
 for fmt in [DocFormat.TOON, DocFormat.JSON]:
-    schema = tool_schema_to_format(search_web, fmt)
+    schema = search_web.to_format(fmt)
     print(f"{fmt.value}: {json.dumps(schema)[:80]}...")
 
 # 3. Multi-tool efficiency
 tools = [calculate, search_web, send_email]
 total_json = sum(len(json.dumps(t.parameters_schema)) for t in tools)
-total_toon = sum(len(schema_to_toon(t.parameters_schema)) for t in tools)
+total_toon = sum(len(t.schema_to_toon()) for t in tools)
 total_sv = ((total_json - total_toon) / total_json) * 100
 print(f"3 tools: JSON {total_json}ch, TOON {total_toon}ch, savings {total_sv:.1f}%")

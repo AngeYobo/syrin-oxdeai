@@ -22,6 +22,7 @@ class StreamAgent(Agent):
     model = almock
     system_prompt = "You are a helpful assistant."
 
+
 agent = StreamAgent()
 chunks = list(agent.stream("Tell me a short story"))
 full_text = "".join(c.text for c in chunks)

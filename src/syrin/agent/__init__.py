@@ -75,7 +75,8 @@ from syrin.response import (
     StreamChunk,
     StructuredOutput,
 )
-from syrin.types import CostInfo, Message, ModelConfig, ProviderResponse, TokenUsage, ToolSpec
+from syrin.tool import ToolSpec
+from syrin.types import CostInfo, Message, ModelConfig, ProviderResponse, TokenUsage
 
 DEFAULT_MAX_TOOL_ITERATIONS = 10
 _UNSET: Any = object()

@@ -51,9 +51,11 @@ print(f"calendar_month={r_cal.calendar_month}")
 agent = Agent(model=almock, rate_limit=APIRateLimit(rpm=500, tpm=150_000))
 print(f"Rate limit config: {agent.rate_limit}")
 
+
 # 5. RateLimitThreshold — warn at 80% RPM
 def on_warning(ctx: ThresholdContext) -> None:
     print(f"  WARNING: {ctx.metric} at {ctx.percentage}%")
+
 
 agent = Agent(
     model=almock,

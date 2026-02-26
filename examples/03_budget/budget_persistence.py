@@ -25,6 +25,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 store_path = Path(__file__).resolve().parent.parent / "data" / "budget_example.json"
 store_path.parent.mkdir(parents=True, exist_ok=True)
 
+
 class PersistentAgent(Agent):
     model = almock
     system_prompt = "You are concise."
@@ -33,6 +34,7 @@ class PersistentAgent(Agent):
         per=RateLimit(day=5.00, month=50.00, month_days=30),
         on_exceeded=raise_on_exceeded,
     )
+
 
 agent = PersistentAgent(
     budget_store=FileBudgetStore(store_path, single_file=True),

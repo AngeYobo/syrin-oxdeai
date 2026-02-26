@@ -9,7 +9,8 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
-from syrin.types import Message, ModelConfig, ProviderResponse, ToolSpec
+from syrin.tool import ToolSpec
+from syrin.types import Message, ModelConfig, ProviderResponse
 
 _log = logging.getLogger(__name__)
 

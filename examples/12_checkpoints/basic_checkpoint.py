@@ -30,7 +30,13 @@ checkpoints = agent.list_checkpoints()
 print(f"Available: {checkpoints}")
 
 # 2. Auto checkpoint triggers
-for trigger in [CheckpointTrigger.STEP, CheckpointTrigger.TOOL, CheckpointTrigger.ERROR, CheckpointTrigger.BUDGET, CheckpointTrigger.MANUAL]:
+for trigger in [
+    CheckpointTrigger.STEP,
+    CheckpointTrigger.TOOL,
+    CheckpointTrigger.ERROR,
+    CheckpointTrigger.BUDGET,
+    CheckpointTrigger.MANUAL,
+]:
     agent = Agent(model=almock, checkpoint=CheckpointConfig(storage="memory", trigger=trigger))
     print(f"  {trigger.value}")
 

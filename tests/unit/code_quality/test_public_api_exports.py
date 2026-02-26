@@ -29,6 +29,17 @@ def test_no_duplicate_exports() -> None:
         seen.add(name)
 
 
+def test_no_private_names_in_public_exports() -> None:
+    """Root __all__ must not expose private (leading-underscore) names."""
+    allowed_dunders = {"__version__"}  # Conventional public attribute
+    for name in syrin.__all__:
+        if name in allowed_dunders:
+            continue
+        assert not name.startswith("_"), (
+            f"syrin.__all__ must not list private names; remove '{name}' or expose via a public facade"
+        )
+
+
 def test_version_is_string() -> None:
     """__version__ must be a non-empty string."""
     assert isinstance(syrin.__version__, str)

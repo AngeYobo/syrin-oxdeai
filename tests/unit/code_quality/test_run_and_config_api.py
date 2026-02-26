@@ -53,7 +53,7 @@ def test_run_accepts_tools_empty_list() -> None:
 
 def test_run_accepts_list_of_tool_specs() -> None:
     """run() must accept tools as list of ToolSpec (e.g. from @tool)."""
-    from syrin.types import ToolSpec
+    from syrin.tool import ToolSpec
 
     # Minimal ToolSpec-compatible: name, description, parameters_schema, func
     spec = ToolSpec(

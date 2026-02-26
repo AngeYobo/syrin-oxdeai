@@ -24,6 +24,7 @@ class Assistant(Agent):
     model = almock
     system_prompt = "You are a helpful assistant that remembers user preferences."
 
+
 assistant = Assistant(memory=Memory())
 assistant.remember("The user's name is Alice.", memory_type=MemoryType.CORE, importance=1.0)
 assistant.remember("User asked about machine learning", memory_type=MemoryType.EPISODIC)

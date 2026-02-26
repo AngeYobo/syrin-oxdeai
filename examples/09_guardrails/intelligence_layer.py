@@ -18,7 +18,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from syrin.guardrails import ContentFilter, GuardrailContext, ParallelEvaluationEngine
+from syrin.guardrails import ContentFilter, GuardrailContext
 from syrin.guardrails.intelligence import (
     AdaptiveThresholdGuardrail,
     AttackSimulator,
@@ -165,7 +165,7 @@ async def example_fuzzing() -> None:
     )
 
     bypasses = [f for f in findings if f.bypassed]
-    print(f"Total mutations: 30")
+    print("Total mutations: 30")
     print(f"Bypasses found: {len(bypasses)}")
 
     for i, finding in enumerate(bypasses[:3], 1):

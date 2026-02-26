@@ -3,7 +3,7 @@
 Demonstrates:
 - Using @syrin.task to define a named task method
 - Researcher agent with research(topic: str) task
-- Invoking tasks via task.func(agent, args)
+- Invoking tasks via agent.task_name(args)
 
 Run: python -m examples.02_tasks.single_task
 """
@@ -34,6 +34,6 @@ class Researcher(Agent):
 
 
 researcher = Researcher()
-result = researcher.research.func(researcher, "AI in healthcare")
+result = researcher.research("AI in healthcare")
 print("Topic: AI in healthcare")
 print(f"Summary: {result[:200]}...")

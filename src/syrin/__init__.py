@@ -261,8 +261,7 @@ from syrin.threshold import (
     ThresholdContext,
     compact_if_available,
 )
-from syrin.tool import tool
-from syrin.types import ToolSpec
+from syrin.tool import ToolSpec, tool
 from syrin.validation import ValidationPipeline, validate_output
 
 __version__ = "0.1.0"
@@ -447,6 +446,7 @@ __all__ = [
     # Tool & Task
     # =============================================================================
     "tool",
+    "ToolSpec",
     "task",
     # =============================================================================
     # Enums

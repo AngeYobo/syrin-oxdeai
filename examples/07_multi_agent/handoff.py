@@ -34,9 +34,11 @@ class Analyzer(Agent):
     model = almock
     system_prompt = analyzer_prompt()
 
+
 class Presenter(Agent):
     model = almock
     system_prompt = presenter_prompt()
+
 
 analyzer = Analyzer()
 result1 = analyzer.response("Analyze the benefits of renewable energy")

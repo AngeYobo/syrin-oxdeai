@@ -8,7 +8,8 @@ Subclass `Model` and override `complete()` for a custom LLM.
 
 ```python
 from syrin.model import Model
-from syrin.types import Message, ModelConfig, ProviderResponse, ToolSpec
+from syrin.tool import ToolSpec
+from syrin.types import Message, ModelConfig, ProviderResponse
 
 class MyModel(Model):
     async def complete(
@@ -28,7 +29,8 @@ Implement `Provider` and register via the registry. See `syrin/providers/` for e
 
 ```python
 from syrin.providers.base import Provider
-from syrin.types import Message, ModelConfig, ProviderResponse, ToolSpec
+from syrin.tool import ToolSpec
+from syrin.types import Message, ModelConfig, ProviderResponse
 
 class MyProvider(Provider):
     async def complete(

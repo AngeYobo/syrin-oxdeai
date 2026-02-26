@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import inspect
-import json
 from collections.abc import Callable
 from typing import Any, Union, get_type_hints
 
+from pydantic import BaseModel, Field
+
 from syrin.enums import DocFormat
-from syrin.types import ToolSpec
+from syrin.tool._schema import schema_to_toon as _schema_to_toon
+from syrin.tool._schema import tool_schema_to_format_dict
 
 _TYPE_TO_JSON: dict[type[Any], str] = {
     str: "string",
@@ -20,127 +22,37 @@ _TYPE_TO_JSON: dict[type[Any], str] = {
 }
 
 
-def schema_to_toon(schema: dict[str, Any], indent: int = 0) -> str:
-    """Convert a JSON schema to TOON format (token-efficient).
+class ToolSpec(BaseModel):
+    """Spec for a tool the model can call. Usually built via syrin.tool()."""
 
-    TOON (Token-Oriented Object Notation) examples:
-    - "type": "string" -> type: string
-    - "required": ["query"] -> required[1]: query
-    - "properties": {...} -> properties:
+    name: str = Field(..., description="Tool name (used in tool_calls.name)")
+    description: str = Field(
+        default="",
+        description="Description for the model. Shown in tool list.",
+    )
+    parameters_schema: dict[str, Any] = Field(
+        default_factory=dict,
+        description="JSON schema for parameters. Model uses this to generate args.",
+    )
+    func: Callable[..., Any] = Field(
+        ...,
+        description="Python function to run. Receives parsed arguments from model.",
+    )
 
-    Args:
-        schema: JSON schema dict
-        indent: Current indentation level
+    model_config = {"arbitrary_types_allowed": True}
 
-    Returns:
-        TOON-formatted string
-    """
-    lines: list[str] = []
-    prefix = "  " * indent
+    def schema_to_toon(self, indent: int = 0) -> str:
+        """Return this tool's parameters schema as TOON (token-efficient) string."""
+        return _schema_to_toon(self.parameters_schema or {}, indent)
 
-    if not isinstance(schema, dict):
-        return f"{prefix}{json.dumps(schema)}"
-
-    for key, value in schema.items():
-        if key == "type" and isinstance(value, str):
-            lines.append(f"{prefix}{key}: {value}")
-        elif key == "properties" and isinstance(value, dict):
-            lines.append(f"{prefix}{key}:")
-            for prop_name, prop_schema in value.items():
-                lines.append(f"{prefix}  {prop_name}:")
-                prop_lines = schema_to_toon(prop_schema, indent + 2).split("\n")
-                for line in prop_lines:
-                    if line.strip():
-                        lines.append(line)
-        elif key == "required" and isinstance(value, list):
-            if value:
-                lines.append(f"{prefix}{key}[{len(value)}]: {','.join(value)}")
-            else:
-                lines.append(f"{prefix}{key}: []")
-        elif key == "items" and isinstance(value, dict):
-            lines.append(f"{prefix}{key}:")
-            item_lines = schema_to_toon(value, indent + 1).split("\n")
-            for line in item_lines:
-                if line.strip():
-                    lines.append(line)
-        elif isinstance(value, dict):
-            lines.append(f"{prefix}{key}:")
-            sub_lines = schema_to_toon(value, indent + 1).split("\n")
-            for line in sub_lines:
-                if line.strip():
-                    lines.append(line)
-        elif isinstance(value, list):
-            if value:
-                lines.append(f"{prefix}{key}: {json.dumps(value)}")
-            else:
-                lines.append(f"{prefix}{key}: []")
-        elif isinstance(value, str):
-            if value:
-                lines.append(f"{prefix}{key}: {value}")
-            else:
-                lines.append(f"{prefix}{key}:")
-        elif value is None:
-            lines.append(f"{prefix}{key}:")
-        else:
-            lines.append(f"{prefix}{key}: {json.dumps(value)}")
-
-    return "\n".join(lines)
-
-
-def tool_schema_to_format(
-    tool_spec: ToolSpec, format: DocFormat = DocFormat.TOON
-) -> dict[str, Any]:
-    """Convert a ToolSpec to the specified format for LLM providers.
-
-    Args:
-        tool_spec: The tool specification
-        format: Output format (TOON, JSON, YAML)
-
-    Returns:
-        Provider-specific tool schema dict
-    """
-    if format == DocFormat.TOON:
-        toon_params = schema_to_toon(tool_spec.parameters_schema or {})
-        return {
-            "type": "function",
-            "function": {
-                "name": tool_spec.name,
-                "description": tool_spec.description or "",
-                "parameters": toon_params,
-            },
-        }
-    elif format == DocFormat.YAML:
-        try:
-            import yaml  # type: ignore[import-untyped]
-        except ImportError:
-            import json
-
-            return {
-                "type": "function",
-                "function": {
-                    "name": tool_spec.name,
-                    "description": tool_spec.description or "",
-                    "parameters": json.dumps(tool_spec.parameters_schema or {}),
-                },
-            }
-
-        return {
-            "type": "function",
-            "function": {
-                "name": tool_spec.name,
-                "description": tool_spec.description or "",
-                "parameters": yaml.dump(tool_spec.parameters_schema or {}),
-            },
-        }
-    else:
-        return {
-            "type": "function",
-            "function": {
-                "name": tool_spec.name,
-                "description": tool_spec.description or "",
-                "parameters": tool_spec.parameters_schema or {"type": "object", "properties": {}},
-            },
-        }
+    def to_format(self, format: DocFormat = DocFormat.TOON) -> dict[str, Any]:
+        """Return this tool as a provider-ready schema dict (TOON, JSON, or YAML)."""
+        return tool_schema_to_format_dict(
+            self.name,
+            self.description or "",
+            self.parameters_schema or {},
+            format,
+        )
 
 
 def _annotation_to_json_schema(annotation: Any) -> dict[str, Any]:
@@ -215,4 +127,4 @@ def tool(
     return decorator
 
 
-__all__ = ["tool", "schema_to_toon", "tool_schema_to_format"]
+__all__ = ["tool", "ToolSpec"]

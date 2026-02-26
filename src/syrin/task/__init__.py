@@ -15,9 +15,8 @@ def task(
     name: str | None = None,
 ) -> TaskSpec | Callable[..., TaskSpec]:
     """
-    Decorator that marks a method as an agent task. The task can be invoked
-    from outside as agent.task_name(args). Parameter types are validated from
-    type hints; execution is wrapped with tracing metadata (no-op for now).
+    Decorator that marks a method as an agent task. Invoke like a method:
+    agent.task_name(args). Parameter types are validated from type hints.
     """
 
     def decorator(f: Callable[..., Any]) -> TaskSpec:

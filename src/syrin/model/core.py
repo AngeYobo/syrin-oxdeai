@@ -10,11 +10,11 @@ from pydantic import BaseModel
 
 from syrin.cost import ModelPricing
 from syrin.exceptions import ModelNotFoundError, ProviderError
+from syrin.tool import ToolSpec
 from syrin.types import (
     Message,
     ModelConfig,
     ProviderResponse,
-    ToolSpec,
 )
 
 if TYPE_CHECKING:

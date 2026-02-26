@@ -132,3 +132,18 @@ def test_task_with_special_characters_in_name() -> None:
         return "ok"
 
     assert task_123_test.name == "task_123_test"
+
+
+def test_task_callable_like_method_from_instance() -> None:
+    """When accessed from an agent instance, task is callable: agent.task_name(args)."""
+
+    class MyAgent:
+        @task
+        def greet(self, name: str) -> str:
+            return f"Hello, {name}"
+
+    agent = MyAgent()
+    assert agent.greet("World") == "Hello, World"
+    # Class access still returns TaskSpec for introspection
+    assert isinstance(MyAgent.greet, TaskSpec)
+    assert MyAgent.greet.name == "greet"

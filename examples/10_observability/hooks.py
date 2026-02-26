@@ -20,8 +20,10 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 total_cost = {"value": 0.0}
 
+
 def track_cost(ctx):
     total_cost["value"] += ctx.get("cost", 0)
+
 
 agent = Agent(model=almock, system_prompt="You are helpful.")
 agent.events.on_response(track_cost)

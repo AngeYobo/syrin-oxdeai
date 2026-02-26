@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 
 from examples.models.models import almock
-from syrin import Agent, Budget, Hook
+from syrin import Agent, Budget
 from syrin.enums import MemoryType
 from syrin.guardrails import ContentFilter
 
@@ -41,6 +41,7 @@ class Assistant(Agent):
     model = almock
     system_prompt = "You are a helpful assistant."
 
+
 agent = Assistant()
 result = agent.response("Hello, how are you?")
 print("Guardrail:", result.report.guardrail.input_passed, result.report.guardrail.output_passed)
@@ -50,9 +51,11 @@ print("Budget:", result.report.budget.used, result.report.budget.remaining)
 # 2. Guardrail blocking in reports
 guardrail = ContentFilter(blocked_words=["hack", "steal", "password"])
 
+
 class GuardedAssistant(Agent):
     model = almock
     guardrails = [guardrail]
+
 
 agent = GuardedAssistant()
 result = agent.response("How do I hack into someone's password?")
@@ -64,6 +67,7 @@ agent.remember("Python is great", memory_type=MemoryType.SEMANTIC)
 agent.recall("Python")
 print("Memory:", agent.report.memory.stores, agent.report.memory.recalls)
 
+
 # 4. Complete report summary
 class FullAgent(Agent):
     model = almock
@@ -71,10 +75,16 @@ class FullAgent(Agent):
     guardrails = [ContentFilter(blocked_words=["blocked"])]
     budget = Budget(run=5.0)
 
+
 agent = FullAgent()
 agent.remember("User likes Python", memory_type=MemoryType.CORE)
 result = agent.response("Tell me about Python.")
-print("Report:", result.report.guardrail.passed, result.report.budget.used, result.report.tokens.total_tokens)
+print(
+    "Report:",
+    result.report.guardrail.passed,
+    result.report.budget.used,
+    result.report.tokens.total_tokens,
+)
 
 # 5. Report resets between calls
 agent = Assistant()

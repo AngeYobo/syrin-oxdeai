@@ -53,13 +53,13 @@ class Researcher(Agent):
         return self.response(f"Research: {topic}").content or ""
 
 researcher = Researcher()
-result = researcher.research.func(researcher, "AI in healthcare")
+result = researcher.research("AI in healthcare")
 ```
 
-**Invocation:** Because `@task` returns a `TaskSpec`, call via `.func(agent, args)`:
+**Invocation:** Call the task like a method: `agent.task_name(args)`.
 
 ```python
-result = researcher.research.func(researcher, "AI trends")
+result = researcher.research("AI trends")
 ```
 
 ---
@@ -96,8 +96,8 @@ class Writer(Agent):
 
 writer = Writer()
 
-# Named task
-summary = writer.research.func(writer, "renewable energy")
+# Named task — call like a method
+summary = writer.research("renewable energy")
 
 # Or direct run for ad-hoc prompts
 ad_hoc = writer.response("Rewrite that in haiku form")

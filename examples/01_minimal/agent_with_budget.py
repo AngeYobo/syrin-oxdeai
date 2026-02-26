@@ -31,6 +31,7 @@ class Assistant(Agent):
     system_prompt = "You are a helpful assistant."
     budget = Budget(run=0.10, on_exceeded=warn_on_exceeded)
 
+
 assistant = Assistant()
 print(f"Budget: ${assistant.budget.run}")
 result = assistant.response("Explain quantum computing briefly")

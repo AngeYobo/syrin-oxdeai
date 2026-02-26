@@ -49,28 +49,8 @@ class ModelConfig(BaseModel):
     )
 
 
-class ToolSpec(BaseModel):
-    """Spec for a tool the model can call. Usually built via syrin.tool()."""
-
-    name: str = Field(..., description="Tool name (used in tool_calls.name)")
-    description: str = Field(
-        default="",
-        description="Description for the model. Shown in tool list.",
-    )
-    parameters_schema: dict[str, Any] = Field(
-        default_factory=dict,
-        description="JSON schema for parameters. Model uses this to generate args.",
-    )
-    func: Callable[..., Any] = Field(
-        ...,
-        description="Python function to run. Receives parsed arguments from model.",
-    )
-
-    model_config = {"arbitrary_types_allowed": True}
-
-
 class TaskSpec(BaseModel):
-    """Specification for an agent task."""
+    """Specification for an agent task. Callable when accessed from an instance: agent.task_name(args)."""
 
     name: str = Field(..., description="Task name")
     parameters: dict[str, Any] = Field(
@@ -80,6 +60,21 @@ class TaskSpec(BaseModel):
     func: Callable[..., Any] | None = Field(default=None, description="Bound callable")
 
     model_config = {"arbitrary_types_allowed": True}
+
+    def __get__(
+        self, instance: Any, owner: type[Any] | None = None
+    ) -> TaskSpec | Callable[..., Any]:
+        """When accessed from an agent instance, return a callable so agent.task_name(args) works."""
+        if instance is None:
+            return self
+        func = self.func
+        if func is None:
+            raise TypeError(f"Task {self.name!r} has no func")
+
+        def bound(*args: Any, **kwargs: Any) -> Any:
+            return func(instance, *args, **kwargs)
+
+        return bound
 
 
 class ToolCall(BaseModel):
@@ -187,9 +182,9 @@ class AgentConfig(BaseModel):
         default="",
         description="System instructions. Sets agent personality and constraints.",
     )
-    tools: list[ToolSpec] = Field(
+    tools: list[Any] = Field(
         default_factory=list,
-        description="Tools the agent can call. Empty = no tools.",
+        description="Tools the agent can call (ToolSpec from syrin.tool). Empty = no tools.",
     )
     budget: dict[str, Any] | None = Field(
         default=None,
@@ -203,7 +198,6 @@ class AgentConfig(BaseModel):
 
 __all__ = [
     "ModelConfig",
-    "ToolSpec",
     "TaskSpec",
     "ToolCall",
     "Message",

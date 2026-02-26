@@ -96,8 +96,9 @@ agent = Agent(
     system_prompt="You are a helpful assistant.",
     context=Context(max_tokens=128000),
 )
-agent.events.on(Hook.CONTEXT_COMPRESS, lambda ctx: compact_events.append("compressed"))
+agent.events.on(Hook.CONTEXT_COMPRESS, lambda _: compact_events.append("compressed"))
 agent.response("Hello!")
+
 
 # 8. Custom ContextManager
 class MyContextManager(ContextManager):
@@ -121,6 +122,7 @@ class MyContextManager(ContextManager):
 
     def on_compact(self, event: Any) -> None:
         print(f"Custom compaction: {event}")
+
 
 agent = Agent(model=almock, context=MyContextManager())
 agent.response("Hello custom!")

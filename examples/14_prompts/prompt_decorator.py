@@ -40,9 +40,11 @@ class ScienceExpert(Agent):
     model = almock
     system_prompt = expert_prompt(domain="quantum physics", tone="academic")
 
+
 class BusinessExpert(Agent):
     model = almock
     system_prompt = expert_prompt(domain="business strategy", tone="practical")
+
 
 # 2. Different agents from same template
 science = ScienceExpert()
@@ -53,14 +55,17 @@ r2 = business.response(question)
 print(f"Science: {r1.content[:60]}...")
 print(f"Business: {r2.content[:60]}...")
 
+
 # 3. Role-based prompts
 class Researcher(Agent):
     model = almock
     system_prompt = role_prompt(role="researcher", specialization="machine learning")
 
+
 class Writer(Agent):
     model = almock
     system_prompt = role_prompt(role="technical writer")
+
 
 # 4. Dynamic prompt at runtime
 for domain in ["Python", "JavaScript", "Rust"]:

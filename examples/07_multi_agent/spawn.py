@@ -24,9 +24,11 @@ class Parent(Agent):
     model = almock
     system_prompt = "You are a coordinator."
 
+
 class Child(Agent):
     model = almock
     system_prompt = "You are a specialist."
+
 
 parent = Parent()
 result = parent.spawn(Child, task="What is AI?")

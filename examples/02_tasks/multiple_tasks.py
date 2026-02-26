@@ -24,9 +24,7 @@ class Writer(Agent):
     """Agent with research and write tasks. Uses @syrin.task for named APIs."""
 
     model = almock
-    system_prompt = (
-        "You are a professional writer. Research thoroughly and write clearly."
-    )
+    system_prompt = "You are a professional writer. Research thoroughly and write clearly."
 
     @task
     def research(self, topic: str) -> str:
@@ -37,15 +35,13 @@ class Writer(Agent):
     @task
     def write(self, topic: str, style: str = "professional") -> str:
         """Write about a topic in the given style."""
-        r = self.response(
-            f"Write a short paragraph about {topic} in a {style} style."
-        )
+        r = self.response(f"Write a short paragraph about {topic} in a {style} style.")
         return r.content or ""
 
 
 writer = Writer()
 topic = "renewable energy"
-research = writer.research.func(writer, topic)
+research = writer.research(topic)
 print(f"Research ({topic}): {research[:100]}...")
-article = writer.write.func(writer, topic, style="concise")
+article = writer.write(topic, style="concise")
 print(f"Article: {article[:150]}...")

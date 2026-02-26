@@ -8,8 +8,6 @@ e2e tests that hit real APIs (with skip when keys are missing).
 
 from __future__ import annotations
 
-import pytest
-
 from syrin import Agent, Model
 
 

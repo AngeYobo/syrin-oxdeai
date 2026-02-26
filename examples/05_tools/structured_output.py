@@ -39,11 +39,13 @@ class UserInfo:
     age: int
     city: str
 
+
 agent = Agent(model=almock, output=Output(UserInfo, validation_retries=3))
 result = agent.response("Extract: John Doe, 35, john@example.com, San Francisco")
 print(f"is_valid: {result.structured.is_valid}")
 if result.structured.parsed:
     print(f"parsed.name: {result.structured.parsed.name}")
+
 
 # 2. Pydantic model as output
 class ProductInfo(BaseModel):
@@ -52,11 +54,13 @@ class ProductInfo(BaseModel):
     in_stock: bool
     category: str
 
+
 agent = Agent(model=almock, output=Output(ProductInfo, validation_retries=3))
 result = agent.response("Product: Widget, $29.99, in stock, electronics")
 print(f"is_valid: {result.structured.is_valid}")
 if result.structured.parsed:
     print(f"parsed: {result.structured.parsed}")
+
 
 # 3. Validation hooks
 @structured
@@ -65,16 +69,21 @@ class SentimentResult:
     confidence: float
     explanation: str
 
+
 agent = Agent(model=almock, output=Output(SentimentResult, validation_retries=3))
+
 
 def on_start(ctx: object) -> None:
     print(f"  VALIDATION START: {ctx.output_type}")
 
+
 def on_success(ctx: object) -> None:
     print(f"  VALIDATION SUCCESS at attempt {ctx.attempt}")
 
+
 def on_failed(ctx: object) -> None:
     print(f"  VALIDATION FAILED: {ctx.reason}")
+
 
 agent.events.on(Hook.OUTPUT_VALIDATION_START, on_start)
 agent.events.on(Hook.OUTPUT_VALIDATION_SUCCESS, on_success)
@@ -82,19 +91,23 @@ agent.events.on(Hook.OUTPUT_VALIDATION_FAILED, on_failed)
 result = agent.response("Analyze: 'This product is amazing!'")
 print(f"is_valid: {result.structured.is_valid}")
 
+
 # 4. Custom validator
 class ReviewResult(BaseModel):
     rating: int
     sentiment: str
     summary: str
 
+
 class RatingValidator(OutputValidator):
     max_retries = 3
 
     def validate(self, output: object, context: ValidationContext) -> ValidationResult:
         data = (
-            output if isinstance(output, dict)
-            else output.model_dump() if hasattr(output, "model_dump")
+            output
+            if isinstance(output, dict)
+            else output.model_dump()
+            if hasattr(output, "model_dump")
             else {}
         )
         rating = data.get("rating", 0)
@@ -115,6 +128,7 @@ class RatingValidator(OutputValidator):
     def on_retry(self, error: str, attempt: int) -> str:
         return f"Error: {error}. Please fix and retry."
 
+
 agent = Agent(
     model=almock,
     output=Output(type=ReviewResult, validator=RatingValidator(), validation_retries=3),
@@ -124,6 +138,7 @@ print(f"is_valid: {result.structured.is_valid}")
 
 # 5. Output with validation context
 from pydantic import field_validator
+
 
 class RestrictedUser(BaseModel):
     name: str
@@ -137,6 +152,7 @@ class RestrictedUser(BaseModel):
         if v.lower() not in allowed:
             raise ValueError(f"Role must be one of: {allowed}")
         return v.lower()
+
 
 agent = Agent(
     model=almock,

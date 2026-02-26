@@ -51,9 +51,11 @@ model = Model.Custom(
 # 4. Structured output
 from pydantic import BaseModel
 
+
 class SentimentAnalysis(BaseModel):
     sentiment: str
     confidence: float
+
 
 model = Model.OpenAI(
     "gpt-4o",

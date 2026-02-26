@@ -219,11 +219,11 @@ def test_agent_report_resets_between_calls() -> None:
 
     agent = Agent(model=_almock(), memory=Memory())
     agent.remember("test data", memory_type=MemoryType.CORE)
-    r1 = agent.response("first")
+    agent.response("first")
     # Report should have memory stores from remember()
-    report1 = agent.report
+    _ = agent.report
 
-    r2 = agent.response("second")
+    agent.response("second")
     report2 = agent.report
     # Report should be fresh (reset at start of each response call)
     assert report2 is not None

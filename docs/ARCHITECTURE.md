@@ -31,8 +31,8 @@ src/syrin/
 ├── response/        # Response, reports
 ├── task.py          # task()
 ├── threshold.py     # ThresholdContext, BudgetThreshold, etc.
-├── tool/            # tool(), schema
-├── types/           # ModelConfig, Message, ToolSpec, etc.
+├── tool/            # tool(), ToolSpec (schema_to_toon, to_format)
+├── types/           # ModelConfig, Message, TaskSpec, etc.
 └── validation.py    # ValidationPipeline, validate_output
 ```
 

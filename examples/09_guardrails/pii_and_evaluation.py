@@ -37,7 +37,9 @@ async def example_content_filter() -> None:
     print("1. ContentFilter — blocked words")
     print("=" * 55)
 
-    guardrail = ContentFilter(blocked_words=["password", "secret", "api_key"], name="security_filter")
+    guardrail = ContentFilter(
+        blocked_words=["password", "secret", "api_key"], name="security_filter"
+    )
 
     safe = GuardrailContext(text="Hello, how are you?", stage=GuardrailStage.INPUT)
     result = await guardrail.evaluate(safe)
@@ -94,7 +96,9 @@ async def example_guardrail_chain() -> None:
 
     chain = GuardrailChain([ContentFilter(blocked_words=["blocked"]), PIIScanner()])
 
-    context = GuardrailContext(text="Hello, my email is user@example.com", stage=GuardrailStage.INPUT)
+    context = GuardrailContext(
+        text="Hello, my email is user@example.com", stage=GuardrailStage.INPUT
+    )
     result = await chain.evaluate(context)
     print(f"Chain result: {result.passed}, decisions: {len(result.decisions)}")
 
@@ -118,19 +122,25 @@ async def example_custom_guardrail() -> None:
             length = len(context.text)
             if length < self.min_length:
                 return GuardrailDecision(
-                    passed=False, rule="too_short",
+                    passed=False,
+                    rule="too_short",
                     reason=f"Too short: {length} (min: {self.min_length})",
                 )
             if length > self.max_length:
                 return GuardrailDecision(
-                    passed=False, rule="too_long",
+                    passed=False,
+                    rule="too_long",
                     reason=f"Too long: {length} (max: {self.max_length})",
                 )
             return GuardrailDecision(passed=True, rule="length_ok")
 
     guardrail = LengthGuardrail(min_length=5, max_length=50)
 
-    for text, label in [("Hi", "too short"), ("Hello world!", "just right"), ("A" * 100, "too long")]:
+    for text, label in [
+        ("Hi", "too short"),
+        ("Hello world!", "just right"),
+        ("A" * 100, "too long"),
+    ]:
         ctx = GuardrailContext(text=text, stage=GuardrailStage.INPUT)
         result = await guardrail.evaluate(ctx)
         print(f"{label}: passed={result.passed}, length={len(text)}")

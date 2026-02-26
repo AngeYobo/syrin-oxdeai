@@ -26,9 +26,11 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # 1. Simple threshold — warn at 50%
 events: list[str] = []
 
+
 def on_50_pct(ctx: ThresholdContext) -> None:
     events.append(f"50% threshold: {ctx.percentage}%")
     print(f"  Threshold fired: {ctx.percentage}% of budget used")
+
 
 agent = Agent(
     model=almock,
@@ -46,11 +48,14 @@ print(f"Events collected: {events}")
 # 2. Multiple thresholds — fallthrough
 levels: list[int] = []
 
+
 def make_handler(pct: int):
     def handler(ctx: ThresholdContext) -> None:
         levels.append(pct)
         print(f"  {pct}% threshold reached")
+
     return handler
+
 
 agent = Agent(
     model=almock,
@@ -68,6 +73,7 @@ agent = Agent(
 agent.response("Tell me about AI")
 print(f"Thresholds triggered: {levels}")
 
+
 # 3. Class-level thresholds
 class MonitoredAgent(Agent):
     model = almock
@@ -82,6 +88,7 @@ class MonitoredAgent(Agent):
         ],
         on_exceeded=warn_on_exceeded,
     )
+
 
 agent = MonitoredAgent()
 agent.response("Hello!")
