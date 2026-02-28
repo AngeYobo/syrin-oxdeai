@@ -51,9 +51,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/syrin"]
+force-include = { "src/syrin/serve/playground_static" = "syrin/serve/playground_static" }
 
 [tool.hatch.build.targets.sdist]
 packages = ["src/syrin"]
+force-include = { "src/syrin/serve/playground_static" = "syrin/serve/playground_static" }
 
 [tool.ruff]
 target-version = "py310"

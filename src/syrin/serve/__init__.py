@@ -7,10 +7,15 @@ from syrin.serve.discovery import (
     AgentCardProvider,
     build_agent_card_json,
 )
-from syrin.serve.http import build_router
+from syrin.serve.http import build_router, create_http_app
+from syrin.serve.playground import add_playground_static_mount
 from syrin.serve.router import AgentRouter
+from syrin.serve.servable import Servable
 
 __all__ = [
+    "Servable",
+    "add_playground_static_mount",
+    "create_http_app",
     "AgentCard",
     "AgentCardAuth",
     "AgentCardProvider",

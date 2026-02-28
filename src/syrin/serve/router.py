@@ -1,11 +1,14 @@
-"""Multi-agent HTTP routing — AgentRouter for multiple agents on one server."""
+"""Multi-agent HTTP routing — AgentRouter for multiple agents/pipelines on one server."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from syrin.serve.servable import Servable
+
 if TYPE_CHECKING:
     from syrin.agent import Agent
+    from syrin.agent.multi_agent import DynamicPipeline, Pipeline
     from syrin.serve.config import ServeConfig
 
 
@@ -19,7 +22,7 @@ def _ensure_serve_deps() -> None:
         ) from e
 
 
-class AgentRouter:
+class AgentRouter(Servable):
     """Router for multiple agents on one HTTP server.
 
     Creates routes per agent: /agent/{name}/chat, /agent/{name}/stream,
@@ -34,25 +37,28 @@ class AgentRouter:
 
     def __init__(
         self,
-        agents: list[Agent],
+        agents: list[Agent | Pipeline | DynamicPipeline],
         *,
         config: ServeConfig | None = None,
         agent_prefix: str = "/agent",
     ) -> None:
-        """Create a router for multiple agents.
+        """Create a router for multiple agents and/or pipelines.
 
         Args:
-            agents: List of Agent instances to serve.
+            agents: List of Agent, Pipeline, or DynamicPipeline instances to serve.
             config: Optional ServeConfig. Defaults used if None.
             agent_prefix: URL prefix for agent routes, e.g. "/agent" yields /agent/{name}/chat.
         """
         _ensure_serve_deps()
+        from syrin.serve.adapter import to_serveable
+
         if not agents:
-            raise ValueError("AgentRouter requires at least one agent")
-        names = [a.name for a in agents]
+            raise ValueError("AgentRouter requires at least one agent or pipeline")
+        self._raw = agents
+        self._serveables = [to_serveable(a) for a in agents]
+        names = [s.name for s in self._serveables]
         if len(names) != len(set(names)):
-            raise ValueError("Agent names must be unique")
-        self._agents = agents
+            raise ValueError("Agent/pipeline names must be unique")
         self._config = config
         self._agent_prefix = agent_prefix.strip().rstrip("/") or "/agent"
         if not self._agent_prefix.startswith("/"):
@@ -68,19 +74,19 @@ class AgentRouter:
 
         cfg = self._config or ServeConfig()
         main = APIRouter()
-        for agent in self._agents:
+        for raw, serveable in zip(self._raw, self._serveables, strict=True):
             sub_config = ServeConfig(
                 protocol=cfg.protocol,
                 host=cfg.host,
                 port=cfg.port,
-                route_prefix=f"{self._agent_prefix}/{agent.name}",
+                route_prefix=f"{self._agent_prefix}/{serveable.name}",
                 stream=cfg.stream,
                 include_metadata=cfg.include_metadata,
                 debug=cfg.debug,
                 enable_playground=cfg.enable_playground,
                 enable_discovery=cfg.enable_discovery,
             )
-            router = build_router(agent, sub_config)
+            router = build_router(raw, sub_config)
             main.include_router(router)
         # Root registry at /.well-known/agent.json — lists all agents when discovery enabled
         if cfg.enable_discovery is not False:
@@ -98,11 +104,11 @@ class AgentRouter:
             async def registry() -> dict[str, Any]:
                 """Multi-agent registry: agents with name, description, url."""
                 agents_list: list[dict[str, Any]] = []
-                for agent in self._agents:
-                    if should_enable_discovery(agent, cfg):
+                for serveable in self._serveables:
+                    if should_enable_discovery(serveable, cfg):
                         card = build_agent_card_json(
-                            agent,
-                            base_url=f"{base}{prefix}/{agent.name}",
+                            serveable,
+                            base_url=f"{base}{prefix}/{serveable.name}",
                         )
                         agents_list.append(
                             {
@@ -113,19 +119,76 @@ class AgentRouter:
                         )
                 return {"agents": agents_list}
 
+        # Playground — when enable_playground=True (multi-agent: agent selector)
+        if cfg.enable_playground:
+            from syrin.serve.playground import _playground_static_dir, get_playground_html
+
+            route_prefix_str = (cfg.route_prefix or "").strip().rstrip("/")
+            route_prefix_str = (
+                "/" + route_prefix_str
+                if route_prefix_str and not route_prefix_str.startswith("/")
+                else route_prefix_str or ""
+            )
+            base_path = f"{route_prefix_str}/playground" if route_prefix_str else "/playground"
+            api_base = f"{route_prefix_str}{self._agent_prefix}".strip("/")
+            api_base = f"/{api_base}/" if api_base else "/"
+            agents_data = [{"name": a.name, "description": a.description} for a in self._serveables]
+
+            @main.get("/playground/config")
+            async def playground_config() -> dict[str, Any]:
+                """Playground config: apiBase, agents, debug, setup_type."""
+                setup_type = "multi" if len(agents_data) > 1 else "single"
+                return {
+                    "apiBase": api_base,
+                    "agents": agents_data,
+                    "debug": cfg.debug,
+                    "setup_type": setup_type,
+                }
+
+            # Static files must be mounted on the main app (router.mount is not transferred).
+            # serve() calls add_playground_static_mount() after include_router.
+            static_dir = _playground_static_dir()
+            if static_dir is None:
+                from fastapi.responses import HTMLResponse
+
+                @main.get("/playground", response_class=HTMLResponse)
+                async def playground() -> str:
+                    """Web playground (inline fallback)."""
+                    return get_playground_html(
+                        base_path=base_path,
+                        api_base=api_base,
+                        agents=agents_data,
+                        debug=cfg.debug,
+                    )
+
         return main
 
     def serve(self, config: ServeConfig | None = None, **config_kwargs: Any) -> None:
-        """Run uvicorn with all agents. Blocks until stopped."""
-        from fastapi import FastAPI
-
+        """Run HTTP server or CLI REPL based on protocol. Blocks until stopped."""
+        from syrin.enums import ServeProtocol
         from syrin.serve.config import ServeConfig
 
-        cfg = (
+        base = (
             config
             if isinstance(config, ServeConfig)
-            else (self._config or ServeConfig(**config_kwargs))
+            else (self._config or ServeConfig())
         )
+        cfg = ServeConfig(**{**vars(base), **config_kwargs}) if config_kwargs else base
+
+        if cfg.protocol == ServeProtocol.CLI:
+            self._serve_cli(cfg)
+            return
+        if cfg.protocol == ServeProtocol.STDIO:
+            self._serve_stdio(cfg, config_kwargs.get("stdin"), config_kwargs.get("stdout"))
+            return
+
+        # HTTP (default)
+        self._serve_http(cfg)
+
+    def _serve_http(self, cfg: ServeConfig) -> None:
+        """Run uvicorn with all agents."""
+        from fastapi import FastAPI
+
         try:
             import uvicorn
         except ImportError as e:
@@ -133,11 +196,59 @@ class AgentRouter:
                 "HTTP serving requires uvicorn. Install with: uv pip install syrin[serve]"
             ) from e
         from syrin.serve.http import _add_startup_endpoint_logging
+        from syrin.serve.playground import add_playground_static_mount
 
         app = FastAPI(
             title="Syrin Multi-Agent",
-            description=f"Agents: {', '.join(a.name for a in self._agents)}",
+            description=f"Agents: {', '.join(a.name for a in self._serveables)}",
         )
-        app.include_router(self.fastapi_router(), prefix=cfg.route_prefix or "")
+        prefix = (cfg.route_prefix or "").strip().rstrip("/")
+        app.include_router(self.fastapi_router(), prefix=prefix or "")
+        if cfg.enable_playground:
+            mount_path = f"/{prefix}/playground" if prefix else "/playground"
+            add_playground_static_mount(app, mount_path)
         _add_startup_endpoint_logging(app)
         uvicorn.run(app, host=cfg.host, port=cfg.port)
+
+    def _select_agent_cli(self) -> Any:
+        """Prompt user to select an agent. Returns the selected serveable."""
+        print("\nSelect agent:")
+        for i, s in enumerate(self._serveables, 1):
+            desc = getattr(s, "description", "") or ""
+            if desc and len(desc) > 50:
+                desc = desc[:47] + "..."
+            print(f"  {i}) {s.name}" + (f" — {desc}" if desc else ""))
+        while True:
+            try:
+                line = input("> ").strip()
+            except (KeyboardInterrupt, EOFError):
+                print("\nBye.")
+                raise SystemExit(0) from None
+            if not line:
+                continue
+            try:
+                idx = int(line)
+                if 1 <= idx <= len(self._serveables):
+                    return self._serveables[idx - 1]
+            except ValueError:
+                pass
+            print("Invalid choice. Enter a number from the list.")
+
+    def _serve_cli(self, cfg: ServeConfig) -> None:
+        """Run CLI REPL with agent selection."""
+        from syrin.serve.cli import run_cli_repl
+
+        print("[Syrin] Multi-agent CLI. Choose an agent to chat with.")
+        serveable = self._select_agent_cli()
+        run_cli_repl(serveable, cfg)
+
+    def _serve_stdio(self, cfg: ServeConfig, stdin: Any = None, stdout: Any = None) -> None:
+        """Run STDIO protocol with agent selection."""
+        import sys
+
+        from syrin.serve.stdio import run_stdio_protocol
+
+        out = stdout if stdout is not None else sys.stdout
+        print("[Syrin] Multi-agent STDIO. Choose an agent.", file=out)
+        serveable = self._select_agent_cli()
+        run_stdio_protocol(serveable, cfg, stdin=stdin, stdout=stdout)

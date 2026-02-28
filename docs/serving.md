@@ -20,7 +20,7 @@ agent = Assistant()
 agent.serve(port=8000)  # HTTP on localhost:8000
 ```
 
-Visit `http://localhost:8000/health`, POST to `/chat` with `{"message": "Hi"}`.
+Visit `http://localhost:8000/health`, POST to `/chat` with `{"message": "Hi"}`, or open `http://localhost:8000/playground` (when `enable_playground=True`) for a chat UI. See [docs/playground.md](playground.md) for details.
 
 ## Protocol Comparison
 
@@ -42,6 +42,7 @@ When using `agent.serve()` or `agent.as_router()`:
 | `/ready` | GET | Readiness probe |
 | `/budget` | GET | Budget state (404 if not configured) |
 | `/describe` | GET | Agent introspection (name, tools, budget) |
+| `/playground` | GET | Web playground (when `enable_playground=True`) |
 | `/mcp` | POST | MCP JSON-RPC (when MCP in agent tools) |
 | `/.well-known/agent.json` | GET | A2A Agent Card (when discovery enabled) |
 

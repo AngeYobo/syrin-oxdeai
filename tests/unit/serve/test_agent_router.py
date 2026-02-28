@@ -100,3 +100,26 @@ def test_agent_router_mount_with_prefix() -> None:
     client = TestClient(app)
     r = client.get("/api/v1/agent/agent-a/health")
     assert r.status_code == 200
+
+
+def test_agent_router_playground_when_enabled() -> None:
+    """AgentRouter with enable_playground returns HTML at /playground."""
+    from fastapi import FastAPI
+
+    from syrin.serve.config import ServeConfig
+    from syrin.serve.playground import add_playground_static_mount
+
+    config = ServeConfig(enable_playground=True)
+    router = AgentRouter(agents=[_AgentA(), _AgentB()], config=config)
+    app = FastAPI()
+    app.include_router(router.fastapi_router())
+    add_playground_static_mount(app, "/playground")
+    client = TestClient(app)
+    r = client.get("/playground")
+    assert r.status_code == 200
+    assert "text/html" in r.headers.get("content-type", "")
+    assert "Syrin Playground" in r.text
+    # Config has multiple agents (Next.js renders agent-select client-side)
+    cfg = client.get("/playground/config")
+    assert cfg.status_code == 200
+    assert len(cfg.json()["agents"]) == 2

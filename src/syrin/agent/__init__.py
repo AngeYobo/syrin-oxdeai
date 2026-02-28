@@ -6,7 +6,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any, TextIO, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from syrin.serve.config import ServeConfig  # noqa: F401
@@ -91,6 +91,7 @@ from syrin.response import (
     StreamChunk,
     StructuredOutput,
 )
+from syrin.serve.servable import Servable
 from syrin.tool import ToolSpec
 from syrin.types import CostInfo, Message, ModelConfig, ProviderResponse, TokenUsage
 
@@ -300,7 +301,7 @@ class _AgentMeta(type):
         return super().__new__(mcs, name, bases, namespace, **kwargs)
 
 
-class Agent(metaclass=_AgentMeta):
+class Agent(Servable, metaclass=_AgentMeta):
     """AI agent that runs completions, tools, memory, and budget control.
 
     An Agent is the main interface for talking to an LLM, executing tools, remembering
@@ -2809,68 +2810,7 @@ class Agent(metaclass=_AgentMeta):
         cfg = config if isinstance(config, ServeConfig) else ServeConfig(**config_kwargs)
         return build_router(self, cfg)
 
-    def serve(
-        self,
-        config: ServeConfig | None = None,
-        *,
-        stdin: TextIO | None = None,
-        stdout: TextIO | None = None,
-        **config_kwargs: Any,
-    ) -> None:
-        """Serve this agent via HTTP, CLI, or STDIO. Blocks until stopped.
-
-        Use for local dev or production. For HTTP, runs uvicorn. For CLI/STDIO,
-        see ServeProtocol. Requires syrin[serve] (fastapi, uvicorn).
-
-        Args:
-            config: Optional ServeConfig. If None, uses defaults.
-            stdin: Input stream for STDIO protocol. Defaults to sys.stdin.
-            stdout: Output stream for STDIO protocol. Defaults to sys.stdout.
-            **config_kwargs: Override ServeConfig fields (protocol, host, port, etc.).
-
-        Example:
-            >>> agent.serve(port=8000)  # HTTP on localhost:8000
-            >>> agent.serve(protocol=ServeProtocol.CLI)  # Interactive REPL
-        """
-        from syrin.enums import ServeProtocol
-        from syrin.serve.config import ServeConfig
-
-        cfg = config if isinstance(config, ServeConfig) else ServeConfig(**config_kwargs)
-
-        if cfg.protocol == ServeProtocol.HTTP:
-            try:
-                import uvicorn
-            except ImportError as e:
-                raise ImportError(
-                    "HTTP serving requires uvicorn. Install with: uv pip install syrin[serve]"
-                ) from e
-            app = _create_fastapi_app(self, cfg)
-            uvicorn.run(app, host=cfg.host, port=cfg.port)
-        elif cfg.protocol == ServeProtocol.CLI:
-            from syrin.serve.cli import run_cli_repl
-
-            run_cli_repl(self, cfg)
-        elif cfg.protocol == ServeProtocol.STDIO:
-            from syrin.serve.stdio import run_stdio_protocol
-
-            run_stdio_protocol(self, cfg, stdin=stdin, stdout=stdout)
-        else:
-            raise ValueError(f"Unknown protocol: {cfg.protocol}")
-
-
-def _create_fastapi_app(agent: Agent, config: ServeConfig) -> Any:
-    """Create a FastAPI app with the agent's router mounted."""
-    from fastapi import FastAPI
-
-    from syrin.serve.http import build_router
-
-    app = FastAPI(title=f"Syrin Agent: {agent.name}", description=agent.description)
-    router = build_router(agent, config)
-    app.include_router(router)
-    from syrin.serve.http import _add_startup_endpoint_logging
-
-    _add_startup_endpoint_logging(app)
-    return app
+    # serve() inherited from Servable — HTTP, CLI, STDIO protocols
 
 
 # Presets and builder

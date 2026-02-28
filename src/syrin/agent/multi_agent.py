@@ -14,6 +14,7 @@ from syrin.enums import DocFormat, Hook, StopReason
 from syrin.events import EventContext, Events
 from syrin.model import Model
 from syrin.response import Response
+from syrin.serve.servable import Servable
 from syrin.types import TokenUsage
 
 _log = logging.getLogger(__name__)
@@ -389,7 +390,7 @@ class PipelineRun:
         return results
 
 
-class Pipeline:
+class Pipeline(Servable):
     """Pipeline for running multiple agents sequentially or in parallel.
 
     Supports fluent API via run() method:
@@ -513,6 +514,16 @@ class Pipeline:
     ) -> list[Response[str]]:
         """Run agents in parallel with async support (traditional API)."""
         return await PipelineRun(self, agents).parallel_async()
+
+    def as_router(self, config: Any | None = None, **config_kwargs: Any) -> Any:
+        """Return a FastAPI APIRouter for this pipeline. Mount on your app."""
+        from syrin.serve.config import ServeConfig
+        from syrin.serve.http import build_router
+
+        cfg = config if isinstance(config, ServeConfig) else ServeConfig(**config_kwargs)
+        return build_router(self, cfg)
+
+    # serve() inherited from Servable — HTTP, CLI, STDIO protocols
 
 
 class AgentTeam:
@@ -665,7 +676,7 @@ def sequential(
 # =============================================================================
 
 
-class DynamicPipeline:
+class DynamicPipeline(Servable):
     """Pipeline where LLM decides how many and what agents to spawn.
 
     This is a truly agentic feature - the LLM analyzes the task and decides:
@@ -696,6 +707,7 @@ class DynamicPipeline:
         max_parallel: int = 10,  # Max agents to spawn in parallel
         debug: bool = False,  # Enable debug logging
         audit: AuditLog | None = None,
+        output_format: str = "clean",  # "clean" = chat-friendly; "verbose" = debug with headers/cost
     ):
         """Initialize DynamicPipeline.
 
@@ -726,6 +738,7 @@ class DynamicPipeline:
         self._format = format
         self._max_parallel = max_parallel
         self._debug = debug
+        self._output_format = output_format
         self._run_metrics: dict[str, Any] = {}
 
         # Build agent name mapping (uses Agent.name; fallback to lowercase class name)
@@ -1033,10 +1046,29 @@ IMPORTANT: Return ONLY valid JSON, no other text."""
         # Fallback: try to parse from text
         return self._parse_agents_spec(content)
 
+    def _build_no_agents_message(self) -> str:
+        """Build a helpful message when the orchestrator spawns no agents."""
+        lines = [
+            "No agents were spawned for this request.",
+            "",
+            "**Available agents:**",
+        ]
+        for _name, agent_class in self._agent_names.items():
+            desc = self._get_agent_description(agent_class)
+            lines.append(f"  {desc}")
+        lines.extend(
+            [
+                "",
+                "Provide a specific task and the orchestrator will choose the right agent(s).",
+            ]
+        )
+        return "\n".join(lines)
+
     def _execute_plan(self, plan: list[dict[str, Any]], mode: str) -> Response[str]:
         """Step 2: Execute the planned agents."""
         if not plan:
-            return Response(content="No agents to spawn", cost=0, tokens=TokenUsage())
+            content = self._build_no_agents_message()
+            return Response(content=content, cost=0, tokens=TokenUsage())
 
         # Emit DYNAMIC_PIPELINE_EXECUTE
         self._emit_hook(
@@ -1215,25 +1247,40 @@ IMPORTANT: Return ONLY valid JSON, no other text."""
         return self._consolidate_results(results), total_cost, TokenUsage(total_tokens=total_tokens)
 
     def _consolidate_results(self, results: list[Response[str]]) -> str:
-        """Consolidate results from multiple agents."""
+        """Consolidate results from multiple agents.
+
+        output_format "clean": Chat-friendly, just the content (for playground/API).
+        output_format "verbose": Debug format with headers and cost breakdown.
+        """
         if not results:
             return "No results"
 
-        consolidated = "=== AGENT RESULTS ===\n\n"
+        if self._output_format == "verbose":
+            consolidated = "=== AGENT RESULTS ===\n\n"
+            for i, result in enumerate(results):
+                consolidated += f"--- Agent {i + 1} ---\n"
+                consolidated += result.content + "\n\n"
+                consolidated += f"[Cost: ${result.cost:.6f}]\n\n"
+            total_cost = sum(r.cost for r in results)
+            total_tokens = sum(r.tokens.total_tokens for r in results)
+            consolidated += f"=== TOTAL: {len(results)} agents ===\n"
+            consolidated += f"Total cost: ${total_cost:.6f}\n"
+            consolidated += f"Total tokens: {total_tokens}\n"
+            return consolidated
 
-        for i, result in enumerate(results):
-            consolidated += f"--- Agent {i + 1} ---\n"
-            consolidated += result.content + "\n\n"
-            consolidated += f"[Cost: ${result.cost:.6f}]\n\n"
+        # "clean" format: concatenate content, no headers (chat-friendly)
+        parts = [r.content.strip() for r in results if r.content.strip()]
+        return "\n\n".join(parts) if parts else "No results"
 
-        total_cost = sum(r.cost for r in results)
-        total_tokens = sum(r.tokens.total_tokens for r in results)
+    def as_router(self, config: Any | None = None, **config_kwargs: Any) -> Any:
+        """Return a FastAPI APIRouter for this dynamic pipeline. Mount on your app."""
+        from syrin.serve.config import ServeConfig
+        from syrin.serve.http import build_router
 
-        consolidated += f"=== TOTAL: {len(results)} agents ===\n"
-        consolidated += f"Total cost: ${total_cost:.6f}\n"
-        consolidated += f"Total tokens: {total_tokens}\n"
+        cfg = config if isinstance(config, ServeConfig) else ServeConfig(**config_kwargs)
+        return build_router(self, cfg)
 
-        return consolidated
+    # serve() inherited from Servable — HTTP, CLI, STDIO protocols
 
 
 __all__ = [

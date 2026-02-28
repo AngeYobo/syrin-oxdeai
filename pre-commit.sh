@@ -49,6 +49,25 @@ run_pytest() {
     echo -e "${GREEN}✓ All tests passed${NC}"
 }
 
+# Run playground ESLint + Prettier
+run_playground_checks() {
+    if [ ! -d "playground" ]; then
+        echo -e "${YELLOW}Skipping playground checks (no playground/ directory)${NC}"
+        return 0
+    fi
+    if ! command -v npm &> /dev/null; then
+        echo -e "${YELLOW}Skipping playground checks (npm not installed)${NC}"
+        return 0
+    fi
+    echo -e "${YELLOW}Running playground ESLint...${NC}"
+    (cd playground && npm ci --silent 2>/dev/null || npm install --silent) && \
+    (cd playground && npm run lint)
+    echo -e "${GREEN}✓ Playground ESLint passed${NC}"
+    echo -e "${YELLOW}Running playground Prettier (format check)...${NC}"
+    (cd playground && npm run format:check)
+    echo -e "${GREEN}✓ Playground Prettier check passed${NC}"
+}
+
 # Main execution
 echo ""
 echo "========================================="
@@ -61,6 +80,7 @@ run_ruff_check
 run_ruff_format
 run_mypy
 run_pytest
+run_playground_checks
 
 echo ""
 echo "========================================="

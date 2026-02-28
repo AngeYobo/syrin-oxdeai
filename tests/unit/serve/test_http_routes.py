@@ -142,3 +142,56 @@ def test_route_prefix_applied() -> None:
     r = client.get("/api/v1/health")
     assert r.status_code == 200
     assert r.json() == {"status": "ok"}
+
+
+def test_playground_enabled_returns_html() -> None:
+    """GET /playground when enable_playground=True returns HTML."""
+    from fastapi import FastAPI
+
+    from syrin.serve.playground import add_playground_static_mount
+
+    agent = _TestAgent()
+    config = ServeConfig(enable_playground=True)
+    router = build_router(agent, config)
+    app = FastAPI()
+    app.include_router(router)
+    add_playground_static_mount(app, "/playground")
+    client = TestClient(app)
+    r = client.get("/playground")
+    assert r.status_code == 200
+    assert "text/html" in r.headers.get("content-type", "")
+    assert "Syrin Playground" in r.text
+    assert "Powered by Syrin" in r.text
+
+
+def test_playground_disabled_returns_404() -> None:
+    """GET /playground when enable_playground=False returns 404."""
+    agent = _TestAgent()
+    config = ServeConfig(enable_playground=False)
+    router = build_router(agent, config)
+    from fastapi import FastAPI
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app)
+    r = client.get("/playground")
+    assert r.status_code == 404
+
+
+def test_chat_with_debug_includes_events() -> None:
+    """POST /chat with debug=True and enable_playground=True includes events."""
+    agent = _TestAgent()
+    config = ServeConfig(debug=True, enable_playground=True)
+    router = build_router(agent, config)
+    from fastapi import FastAPI
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app)
+    r = client.post("/chat", json={"message": "Hi"})
+    assert r.status_code == 200
+    data = r.json()
+    assert "content" in data
+    assert "events" in data
+    assert isinstance(data["events"], list)
+    assert len(data["events"]) > 0

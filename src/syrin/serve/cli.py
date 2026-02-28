@@ -36,13 +36,14 @@ def run_cli_repl(agent: Agent, config: ServeConfig) -> None:
         try:
             r = agent.response(line)
             print(str(r.content))
-            cost_str = f"${r.cost:.4f}".rstrip("0").rstrip(".")
+            cost_str = f"${r.cost:.6f}".rstrip("0").rstrip(".")
             if cost_str == "$":
                 cost_str = "$0"
             tokens = r.tokens.total_tokens if r.tokens else 0
             parts = [f"Cost: {cost_str}", f"Tokens: {tokens}"]
             if r.budget_remaining is not None:
-                parts.append(f"Budget remaining: ${r.budget_remaining:.2f}")
+                rem_str = f"${r.budget_remaining:.6f}".rstrip("0").rstrip(".")
+                parts.append(f"Budget remaining: {rem_str if rem_str != '$' else '$0'}")
             print(" | ".join(parts))
         except KeyboardInterrupt:
             print("\nInterrupted.")

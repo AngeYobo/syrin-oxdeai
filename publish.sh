@@ -35,6 +35,15 @@ done
 echo "Cleaning previous builds..."
 rm -rf dist/
 
+# Build playground
+echo "Building playground..."
+cd playground
+npm ci
+npm run build
+mkdir -p ../src/syrin/serve/playground_static
+cp -r out/* ../src/syrin/serve/playground_static/
+cd ..
+
 # Build the package
 echo "Building package..."
 python -m build

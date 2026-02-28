@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from syrin.agent import Agent
+    from syrin.agent.multi_agent import DynamicPipeline, Pipeline
     from syrin.serve.config import ServeConfig
 
 
@@ -45,17 +46,23 @@ def _ensure_serve_deps() -> None:
 
 
 def build_router(
-    agent: Agent,
+    agent: Agent | Pipeline | DynamicPipeline,
     config: ServeConfig,
 ) -> Any:
-    """Build a FastAPI APIRouter for the given agent and config.
+    """Build a FastAPI APIRouter for the given agent, pipeline, or dynamic pipeline.
+
+    Accepts Agent, Pipeline, or DynamicPipeline. Pipelines are wrapped in an
+    internal adapter that implements arun, astream, events, etc.
 
     Routes: POST /chat, POST /stream, GET /health, GET /ready, GET /budget, GET /describe.
-    Use agent.as_router() or mount the router on an existing FastAPI app.
+    Use agent.as_router(), pipeline.serve(), or mount the router on an existing FastAPI app.
 
     Requires syrin[serve] (fastapi, uvicorn).
     """
     _ensure_serve_deps()
+    from syrin.serve.adapter import to_serveable
+
+    agent = to_serveable(agent)
     from fastapi import APIRouter, Body
     from fastapi.responses import JSONResponse, StreamingResponse
 
@@ -76,6 +83,12 @@ def build_router(
             return message.strip(), r.get("thread_id")
         return "", None
 
+    collect_debug = config.debug and config.enable_playground
+    if collect_debug:
+        from syrin.serve.playground import _attach_event_collector
+
+        _attach_event_collector(agent)
+
     @router.post(_route("/chat"))
     async def chat(body: dict[str, Any] | None = Body(default=None)) -> Any:  # noqa: B008
         """Run agent and return full response. POST body: {message: str}."""
@@ -87,7 +100,14 @@ def build_router(
             )
         start = time.perf_counter()
         try:
-            r: Response[str] = await agent.arun(msg)
+            if collect_debug:
+                from syrin.serve.playground import _collect_events
+
+                with _collect_events() as events_list:
+                    r: Response[str] = await agent.arun(msg)
+            else:
+                r = await agent.arun(msg)
+                events_list = []
             elapsed = time.perf_counter() - start
             out: dict[str, Any] = {"content": str(r.content)}
             if config.include_metadata:
@@ -100,6 +120,8 @@ def build_router(
                 out["model"] = r.model
                 out["stop_reason"] = str(r.stop_reason)
                 out["duration"] = round(elapsed, 4)
+            if collect_debug and events_list:
+                out["events"] = [{"hook": h, "ctx": c} for h, c in events_list]
             return JSONResponse(content=out)
         except Exception as e:
             return JSONResponse(
@@ -117,13 +139,111 @@ def build_router(
                 content={"error": "Missing 'message', 'input', or 'content' in body"},
             )
 
+        def _emit(d: dict[str, Any]) -> str:
+            return f"data: {json.dumps(d)}\n\n"
+
+        def _emit_budget() -> Any:
+            """Emit budget event when metadata enabled and agent has budget."""
+            if not config.include_metadata:
+                return
+            state = agent.budget_state
+            if state is None:
+                return
+            return _emit(
+                {
+                    "type": "budget",
+                    "limit": state.limit,
+                    "remaining": state.remaining,
+                    "spent": state.spent,
+                    "percent_used": state.percent_used,
+                }
+            )
+
         async def sse_gen() -> Any:
             accumulated = ""
-            async for chunk in agent.astream(msg):
-                text = getattr(chunk, "text", "") or getattr(chunk, "content", "")
-                accumulated += text
-                line = json.dumps({"text": text, "accumulated": accumulated}) + "\n"
-                yield f"data: {line}\n\n"
+            events_list: list[tuple[str, dict[str, Any]]] = []
+            tokens_val: dict[str, Any] | None = None
+            progressive = collect_debug
+
+            if collect_debug:
+                from syrin.serve.playground import _collect_events
+
+                with _collect_events() as evts:
+                    if progressive:
+                        yield _emit({"type": "status", "message": "Thinking…"})
+                    last_event_idx = 0
+                    async for chunk in agent.astream(msg):
+                        # Support _hook: chunks from DynamicPipeline adapter (real-time hooks)
+                        hook_data = getattr(chunk, "_hook", None)
+                        if hook_data is not None:
+                            h, c = hook_data
+                            # evts already updated by collector (adapter.events) in pipeline thread
+                            if progressive:
+                                yield _emit({"type": "hook", "hook": h, "ctx": c})
+                            if (b := _emit_budget()) is not None:
+                                yield b
+                            continue
+                        while last_event_idx < len(evts):
+                            h, c = evts[last_event_idx]
+                            last_event_idx += 1
+                            if progressive:
+                                yield _emit({"type": "hook", "hook": h, "ctx": c})
+                        text = getattr(chunk, "text", "") or getattr(chunk, "content", "")
+                        accumulated += text
+                        if progressive:
+                            yield _emit({"type": "text", "text": text, "accumulated": accumulated})
+                        else:
+                            yield _emit({"text": text, "accumulated": accumulated})
+                        if (b := _emit_budget()) is not None:
+                            yield b
+                    while last_event_idx < len(evts):
+                        h, c = evts[last_event_idx]
+                        last_event_idx += 1
+                        if progressive:
+                            yield _emit({"type": "hook", "hook": h, "ctx": c})
+                    events_list = list(evts)
+                    for _h, c in reversed(evts):
+                        if isinstance(c, dict) and "tokens" in c:
+                            t = c["tokens"]
+                            tokens_val = (
+                                t
+                                if isinstance(t, dict)
+                                else (
+                                    {
+                                        "input_tokens": getattr(t, "input_tokens", 0),
+                                        "output_tokens": getattr(t, "output_tokens", 0),
+                                        "total_tokens": getattr(t, "total_tokens", 0),
+                                    }
+                                )
+                            )
+                            break
+            else:
+                async for chunk in agent.astream(msg):
+                    text = getattr(chunk, "text", "") or getattr(chunk, "content", "")
+                    accumulated += text
+                    yield _emit({"text": text, "accumulated": accumulated})
+                    if (b := _emit_budget()) is not None:
+                        yield b
+
+            done: dict[str, Any] = {"done": True}
+            if progressive:
+                done["type"] = "done"
+            if config.include_metadata:
+                state = agent.budget_state
+                if state is not None:
+                    done["cost"] = state.spent
+                    done["budget_remaining"] = state.remaining
+                    done["budget"] = {
+                        "limit": state.limit,
+                        "remaining": state.remaining,
+                        "spent": state.spent,
+                        "percent_used": state.percent_used,
+                    }
+                if tokens_val:
+                    done["tokens"] = tokens_val
+            if collect_debug and events_list:
+                done["events"] = [{"hook": h, "ctx": c} for h, c in events_list]
+            yield _emit(done)
 
         return StreamingResponse(
             sse_gen(),
@@ -162,13 +282,20 @@ def build_router(
 
     @router.get(_route("/describe"))
     async def describe() -> dict[str, Any]:
-        """Runtime introspection: name, tools, budget config."""
-        tool_names = [t.name for t in agent.tools]
+        """Runtime introspection: name, tools (full specs), budget, internal_agents, setup_type."""
+        tools_list: list[dict[str, Any]] = [
+            {
+                "name": t.name,
+                "description": t.description or "",
+                "parameters": t.parameters_schema or {},
+            }
+            for t in agent.tools
+        ]
         budget_state = agent.budget_state
-        return {
+        out: dict[str, Any] = {
             "name": agent.name,
             "description": agent.description,
-            "tools": tool_names,
+            "tools": tools_list,
             "budget": (
                 {
                     "limit": budget_state.limit,
@@ -180,6 +307,11 @@ def build_router(
                 else None
             ),
         }
+        internal = getattr(agent, "internal_agents", None)
+        if internal:
+            out["internal_agents"] = internal
+            out["setup_type"] = "dynamic_pipeline"
+        return out
 
     # MCP co-location — when agent has MCP in tools, mount /mcp
     mcp_instances = getattr(agent, "_mcp_instances", []) or []
@@ -222,4 +354,71 @@ def build_router(
                 )
             return build_agent_card_json(agent, base_url=base_url)
 
+    # Playground — when enable_playground=True
+    if config.enable_playground:
+        from syrin.serve.playground import _playground_static_dir, get_playground_html
+
+        # API base for playground fetch URLs
+        api_base = prefix.rstrip("/") if prefix else ""
+        agents_data = [{"name": agent.name, "description": agent.description}]
+
+        @router.get(_route("/playground/config"))
+        async def playground_config() -> dict[str, Any]:
+            """Playground config: apiBase, agents, debug, setup_type."""
+            setup_type = "single"
+            if len(agents_data) > 1:
+                setup_type = "multi"
+            elif len(agents_data) == 1 and agents_data[0].get("name") == "dynamic-pipeline":
+                setup_type = "dynamic_pipeline"
+            return {
+                "apiBase": api_base or "/",
+                "agents": agents_data,
+                "debug": config.debug,
+                "setup_type": setup_type,
+            }
+
+        # Static files must be mounted on the main app (router.mount is not transferred).
+        # agent.serve() and AgentRouter.serve() call add_playground_static_mount().
+        static_dir = _playground_static_dir()
+        if static_dir is None:
+            from fastapi.responses import HTMLResponse
+
+            @router.get(_route("/playground"), response_class=HTMLResponse)
+            async def playground() -> str:
+                """Web playground (inline fallback when Next.js build not found)."""
+                return get_playground_html(
+                    base_path=_route("/playground"),
+                    api_base=api_base,
+                    agents=agents_data,
+                    debug=config.debug,
+                )
+
     return router
+
+
+def create_http_app(
+    obj: Agent | Pipeline | DynamicPipeline,
+    config: ServeConfig,
+) -> Any:
+    """Create a FastAPI app for agent, pipeline, or dynamic pipeline.
+
+    Use with agent.serve(), pipeline.serve(), or for custom mounting.
+    """
+    from fastapi import FastAPI
+
+    from syrin.serve.adapter import to_serveable
+    from syrin.serve.playground import add_playground_static_mount
+
+    serveable = to_serveable(obj)
+    app = FastAPI(
+        title=f"Syrin: {serveable.name}",
+        description=getattr(serveable, "description", "") or "",
+    )
+    router = build_router(obj, config)
+    app.include_router(router)
+    if config.enable_playground:
+        prefix = (config.route_prefix or "").strip().rstrip("/")
+        mount_path = f"/{prefix}/playground" if prefix else "/playground"
+        add_playground_static_mount(app, mount_path)
+    _add_startup_endpoint_logging(app)
+    return app

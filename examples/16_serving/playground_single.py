@@ -1,13 +1,11 @@
-"""HTTP Serving Example.
+"""Playground: Single Agent Example.
 
 Demonstrates:
-- agent.as_router() — mount on existing FastAPI app
-- agent.serve() — run uvicorn with one agent
-- Routes: /chat, /stream, /health, /ready, /budget, /describe
+- Single agent with budget
+- Visit http://localhost:8000/playground
+- Chat, budget gauge, observability (debug=True)
 
-Requires: uv pip install syrin[serve]
-
-Run: python -m examples.serving.http_serve
+Run: python -m examples.serving.playground_single
 """
 
 from __future__ import annotations
@@ -29,7 +27,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 class Assistant(Agent):
     name = "assistant"
-    description = "Helpful assistant for questions and tasks"
+    description = "Helpful assistant — single agent demo"
     model = almock
     system_prompt = "You are a helpful assistant. Be concise."
     budget = Budget(run=0.5, per=RateLimit(hour=10, day=100, week=700))
@@ -37,6 +35,4 @@ class Assistant(Agent):
 
 if __name__ == "__main__":
     agent = Assistant()
-    # Run HTTP server on port 8000
-    # Visit http://localhost:8000/health, POST to /chat with {"message": "Hi"}
-    agent.serve(port=8000)
+    agent.serve(port=8000, enable_playground=True, debug=True)
