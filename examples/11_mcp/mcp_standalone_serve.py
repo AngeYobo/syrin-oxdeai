@@ -27,8 +27,18 @@ from syrin.enums import Hook
 # Demo mock catalog — replace with real search in production.
 # Returning structured data prevents LLM loop (keeps calling) and hallucination (inventing results).
 _MOCK_CATALOG = [
-    {"id": "s1", "name": "Nike Air Max 270", "price": 150, "description": "Stylish sneaker for casual wear."},
-    {"id": "s2", "name": "Adidas Ultraboost", "price": 180, "description": "Comfortable running shoe."},
+    {
+        "id": "s1",
+        "name": "Nike Air Max 270",
+        "price": 150,
+        "description": "Stylish sneaker for casual wear.",
+    },
+    {
+        "id": "s2",
+        "name": "Adidas Ultraboost",
+        "price": 180,
+        "description": "Comfortable running shoe.",
+    },
     {"id": "s3", "name": "Vans Old Skool", "price": 60, "description": "Iconic skate shoe."},
 ]
 

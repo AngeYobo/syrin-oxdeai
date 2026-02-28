@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from syrin.mcp.schema import tool_spec_to_mcp
+from syrin.mcp.schema import tool_spec_to_mcp, validate_tool_arguments
 
 if TYPE_CHECKING:
     from syrin.mcp.server import MCP
@@ -84,6 +84,7 @@ def build_mcp_router(mcp: MCP) -> Any:
             for spec in mcp.tools():
                 if spec.name == name:
                     try:
+                        validate_tool_arguments(spec, arguments)
                         result = spec.func(**arguments)
                         content = (
                             [{"type": "text", "text": str(result)}] if result is not None else []
@@ -100,12 +101,15 @@ def build_mcp_router(mcp: MCP) -> Any:
                                 Hook.MCP_TOOL_CALL_END,
                                 {"tool_name": name, "arguments": arguments, "error": str(e)},
                             )
+                        import jsonschema
+
+                        code = -32602 if isinstance(e, jsonschema.ValidationError) else -32603
                         return JSONResponse(
                             status_code=200,
                             content={
                                 "jsonrpc": "2.0",
                                 "id": req_id,
-                                "error": {"code": -32603, "message": str(e)},
+                                "error": {"code": code, "message": str(e)},
                             },
                         )
             if emit:

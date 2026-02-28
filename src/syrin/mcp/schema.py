@@ -8,6 +8,22 @@ if TYPE_CHECKING:
     pass
 
 
+def validate_tool_arguments(spec: Any, arguments: dict[str, Any]) -> None:
+    """Validate arguments against tool's parameters_schema. Raises jsonschema.ValidationError."""
+    schema = getattr(spec, "parameters_schema", None) or {}
+    if not schema or not schema.get("properties"):
+        return
+    import jsonschema
+
+    full_schema = {
+        "type": "object",
+        "properties": schema.get("properties", {}),
+        "required": schema.get("required", []),
+        "additionalProperties": schema.get("additionalProperties", True),
+    }
+    jsonschema.validate(arguments, full_schema)
+
+
 def tool_spec_to_mcp(t: Any) -> dict[str, Any]:
     """Convert Syrin ToolSpec to MCP tool schema (name, description, inputSchema)."""
     return {

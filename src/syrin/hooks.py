@@ -97,6 +97,11 @@ BUDGET
 - BUDGET_EXCEEDED: Budget exceeded
   Context: {used: float, limit: float, exceeded_by: float}
 
+DISCOVERY
+---------
+- DISCOVERY_REQUEST: When /.well-known/agent.json is requested
+  Context: {agent_name: str, path: str, user_agent: str (optional)}
+
 CONTEXT
 -------
 - CONTEXT_COMPRESS: Context compression triggered
@@ -450,6 +455,18 @@ HOOK_SCHEMAS: dict[Hook, HookContextSchema] = {
             "used": 5.5,
             "limit": 5.0,
             "exceeded_by": 0.5,
+        },
+    ),
+    Hook.DISCOVERY_REQUEST: HookContextSchema(
+        hook=Hook.DISCOVERY_REQUEST,
+        description="When /.well-known/agent.json is requested",
+        fields={
+            "agent_name": str,
+            "path": str,
+        },
+        example={
+            "agent_name": "product-agent",
+            "path": "/.well-known/agent.json",
         },
     ),
     Hook.CHECKPOINT_SAVE: HookContextSchema(

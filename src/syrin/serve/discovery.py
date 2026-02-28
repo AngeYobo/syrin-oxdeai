@@ -111,26 +111,39 @@ class AgentCard:
 
 
 def build_agent_card_json(agent: Agent, base_url: str = "http://localhost:8000") -> dict[str, Any]:
-    """Build A2A Agent Card JSON from agent. Uses agent.agent_card override for provider/auth if set."""
+    """Build A2A Agent Card JSON from agent. Uses agent_card class attr to override auto-generated fields."""
     base_card = AgentCard.from_agent(agent, base_url=base_url)
     override = getattr(agent.__class__, "agent_card", None)
-    if isinstance(override, AgentCard):
-        # Merge: override provider, auth, capabilities; base keeps name, description, skills, url
-        out = base_card.to_dict()
-        if override.provider:
-            out["provider"] = {
-                "organization": override.provider.organization,
-                "url": override.provider.url,
-            }
-        if override.authentication:
-            auth: dict[str, Any] = {"schemes": override.authentication.schemes}
-            if override.authentication.oauth_url:
-                auth["oauth_url"] = override.authentication.oauth_url
-            out["authentication"] = auth
-        if override.capabilities:
-            out["capabilities"] = {**out.get("capabilities", {}), **override.capabilities}
-        return out
-    return base_card.to_dict()
+    if not isinstance(override, AgentCard):
+        return base_card.to_dict()
+    out = base_card.to_dict()
+    if override.name:
+        out["name"] = override.name
+    if override.description:
+        out["description"] = override.description
+    if override.url:
+        out["url"] = override.url
+    if override.version:
+        out["version"] = override.version
+    if override.skills:
+        out["skills"] = override.skills
+    if override.provider:
+        out["provider"] = {
+            "organization": override.provider.organization,
+            "url": override.provider.url,
+        }
+    if override.authentication:
+        auth: dict[str, Any] = {"schemes": override.authentication.schemes}
+        if override.authentication.oauth_url:
+            auth["oauth_url"] = override.authentication.oauth_url
+        out["authentication"] = auth
+    if override.capabilities:
+        out["capabilities"] = {**out.get("capabilities", {}), **override.capabilities}
+    if override.default_input_modes:
+        out["defaultInputModes"] = override.default_input_modes
+    if override.default_output_modes:
+        out["defaultOutputModes"] = override.default_output_modes
+    return out
 
 
 def should_enable_discovery(agent: Agent, config: Any) -> bool:

@@ -18,7 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = ["pydantic>=2.0", "httpx", "tiktoken", "python-dotenv>=1.2.1"]
+dependencies = ["pydantic>=2.0", "httpx", "tiktoken", "python-dotenv>=1.2.1", "jsonschema>=4.0"]
 
 [project.urls]
 Homepage = "https://syrin.ai/"
@@ -154,6 +154,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "starlette"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "jsonschema"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

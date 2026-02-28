@@ -104,3 +104,58 @@ async def test_well_known_agent_json_not_added_when_discovery_off() -> None:
     resp = client.get("/.well-known/agent.json")
     # Route not registered when discovery off → 404
     assert resp.status_code == 404
+
+
+def test_discovery_request_hook_emitted() -> None:
+    """Hook.DISCOVERY_REQUEST is emitted when /.well-known/agent.json is requested."""
+
+    from syrin.enums import Hook
+
+    received: list[tuple[str, dict]] = []
+
+    def on_discovery(ctx: dict) -> None:
+        received.append(("DISCOVERY_REQUEST", dict(ctx)))
+
+    agent = _almock()
+    agent.events.on(Hook.DISCOVERY_REQUEST, on_discovery)
+    config = ServeConfig(enable_discovery=True)
+    router = build_router(agent, config)
+    from fastapi import FastAPI
+    from starlette.testclient import TestClient
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app)
+    resp = client.get("/.well-known/agent.json")
+    assert resp.status_code == 200
+    assert len(received) == 1
+    assert received[0][0] == "DISCOVERY_REQUEST"
+    assert received[0][1]["agent_name"] == "test-agent"
+    assert received[0][1]["path"] == "/.well-known/agent.json"
+
+
+def test_agent_card_override_from_class() -> None:
+    """agent_card = AgentCard(...) on Agent class overrides auto-generated fields."""
+
+    from syrin import AgentCard, AgentCardAuth, AgentCardProvider
+    from syrin.model import Model
+
+    class CustomAgent(Agent):
+        name = "custom-agent"
+        description = "Custom discovery agent"
+        model = Model.Almock()
+        agent_card = AgentCard(
+            provider=AgentCardProvider(organization="MyCompany", url="https://mycompany.com"),
+            authentication=AgentCardAuth(
+                schemes=["oauth2"],
+                oauth_url="https://auth.mycompany.com/token",
+            ),
+        )
+
+    agent = CustomAgent()
+    card = build_agent_card_json(agent, base_url="http://localhost:9000")
+    assert card["name"] == "custom-agent"
+    assert card["provider"]["organization"] == "MyCompany"
+    assert card["provider"]["url"] == "https://mycompany.com"
+    assert card["authentication"]["schemes"] == ["oauth2"]
+    assert card["authentication"]["oauth_url"] == "https://auth.mycompany.com/token"

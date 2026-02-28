@@ -258,6 +258,7 @@ class Hook(StrEnum):
 
     SERVE_REQUEST_START = "serve.request.start"
     SERVE_REQUEST_END = "serve.request.end"
+    DISCOVERY_REQUEST = "discovery.request"
 
     MCP_CONNECTED = "mcp.connected"
     MCP_DISCONNECTED = "mcp.disconnected"

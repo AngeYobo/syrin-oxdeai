@@ -206,6 +206,20 @@ def build_router(
         @router.get(_route("/.well-known/agent.json"))
         async def agent_card() -> dict[str, Any]:
             """A2A Agent Card for discovery. GET /.well-known/agent.json."""
+            emit = getattr(agent, "_emit_event", None)
+            if emit is not None:
+                from syrin.enums import Hook
+                from syrin.events import EventContext
+
+                emit(
+                    Hook.DISCOVERY_REQUEST,
+                    EventContext(
+                        {
+                            "agent_name": getattr(agent, "name", ""),
+                            "path": "/.well-known/agent.json",
+                        }
+                    ),
+                )
             return build_agent_card_json(agent, base_url=base_url)
 
     return router

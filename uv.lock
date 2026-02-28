@@ -1887,6 +1887,7 @@ version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
+    { name = "jsonschema" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "tiktoken" },
@@ -1923,6 +1924,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'dev'" },
     { name = "fastapi", marker = "extra == 'serve'" },
     { name = "httpx" },
+    { name = "jsonschema", specifier = ">=4.0" },
     { name = "litellm", marker = "extra == 'litellm'" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "openai", marker = "extra == 'openai'" },

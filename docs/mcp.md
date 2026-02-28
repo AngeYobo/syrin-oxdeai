@@ -111,6 +111,8 @@ The `/mcp` endpoint speaks JSON-RPC 2.0:
 - `tools/list` — Returns list of tools with name, description, inputSchema
 - `tools/call` — Executes a tool: `{"name": "search_products", "arguments": {"query": "shoes"}}`
 
+**Input validation** — Tool arguments are validated against the tool's JSON schema before execution. Invalid arguments (missing required fields, wrong types) return JSON-RPC error `-32602` (Invalid params).
+
 ## MCP lifecycle events
 
 MCP emits lifecycle events you can subscribe to:
@@ -135,6 +137,8 @@ mcp.events.on(Hook.MCP_DISCONNECTED, lambda ctx: print("Client disconnected"))
 
 ## Examples
 
-- `examples/11_mcp/mcp_server_class.py` — syrin.MCP with @tool
+- `examples/11_mcp/mcp_server_class.py` — syrin.MCP with @tool, .tools(), .select()
 - `examples/11_mcp/mcp_standalone_serve.py` — Standalone serve (HTTP/STDIO) + MCP lifecycle events
 - `examples/11_mcp/mcp_colocation.py` — MCP co-located with agent
+- `examples/11_mcp/mcp_client.py` — MCPClient consuming remote MCP server (start mcp_standalone_serve first)
+- `examples/11_mcp/mcp_select.py` — .select() to give agent only a subset of tools

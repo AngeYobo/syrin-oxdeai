@@ -6,7 +6,7 @@ import json
 import sys
 from typing import TYPE_CHECKING, Any, TextIO
 
-from syrin.mcp.schema import tool_spec_to_mcp
+from syrin.mcp.schema import tool_spec_to_mcp, validate_tool_arguments
 
 if TYPE_CHECKING:
     from syrin.mcp.server import MCP
@@ -125,6 +125,7 @@ def run_stdio_mcp(
             for spec in mcp.tools():
                 if spec.name == name:
                     try:
+                        validate_tool_arguments(spec, arguments)
                         result = spec.func(**arguments)
                         content = (
                             [{"type": "text", "text": str(result)}] if result is not None else []
@@ -143,11 +144,14 @@ def run_stdio_mcp(
                                 Hook.MCP_TOOL_CALL_END,
                                 {"tool_name": name, "arguments": arguments, "error": str(e)},
                             )
+                        import jsonschema
+
+                        code = -32602 if isinstance(e, jsonschema.ValidationError) else -32603
                         write_response(
                             {
                                 "jsonrpc": "2.0",
                                 "id": req_id,
-                                "error": {"code": -32603, "message": str(e)},
+                                "error": {"code": code, "message": str(e)},
                             }
                         )
                     break

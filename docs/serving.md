@@ -62,6 +62,23 @@ ProductAgent().serve(port=8000)
 # GET /.well-known/agent.json returns: name, description, url, skills (tools), etc.
 ```
 
+**Override Agent Card** — Set `agent_card = syrin.AgentCard(...)` on your Agent class to override auto-generated fields (provider, authentication, capabilities, name, description, etc.):
+
+```python
+from syrin import Agent, AgentCard, AgentCardAuth, AgentCardProvider
+
+class ProductAgent(Agent):
+    name = "product-agent"
+    description = "E-commerce assistant"
+    model = Model.Almock()
+    agent_card = AgentCard(
+        provider=AgentCardProvider(organization="MyCompany", url="https://mycompany.com"),
+        authentication=AgentCardAuth(schemes=["oauth2"], oauth_url="https://auth.mycompany.com/token"),
+    )
+```
+
+**Discovery hook** — `Hook.DISCOVERY_REQUEST` is emitted when `/.well-known/agent.json` is requested. Context: `agent_name`, `path`.
+
 **Disable discovery:** `ServeConfig(enable_discovery=False)`
 
 ## Mount on Existing FastAPI App

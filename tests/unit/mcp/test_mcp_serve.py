@@ -131,3 +131,47 @@ def test_mcp_serve_http_smoke() -> None:
     assert "result" in data
     assert "tools" in data["result"]
     assert len(data["result"]["tools"]) >= 1
+
+
+def test_mcp_input_validation_rejects_invalid_args() -> None:
+    """tools/call validates arguments against schema; invalid args return -32602."""
+
+    class ProductMCP(MCP):
+        @tool
+        def search_products(self, query: str) -> str:
+            return f"Results: {query}"
+
+    mcp = ProductMCP()
+    from fastapi import FastAPI
+
+    from syrin.mcp.http import build_mcp_router
+
+    router = build_mcp_router(mcp)
+    app = FastAPI()
+    app.include_router(router, prefix="/mcp")
+    from starlette.testclient import TestClient
+
+    client = TestClient(app)
+    client.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {}},
+        },
+    )
+
+    resp = client.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {"name": "search_products", "arguments": {}},
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "error" in data
+    assert data["error"]["code"] == -32602
