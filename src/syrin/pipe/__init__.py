@@ -11,9 +11,16 @@ T = TypeVar("T")
 
 def _run_maybe_async(val: Any) -> Any:
     """If val is a coroutine, run it and return result; else return val."""
-    if asyncio.iscoroutine(val):
+    if not asyncio.iscoroutine(val):
+        return val
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
         return asyncio.run(val)
-    return val
+    raise RuntimeError(
+        "Pipe.result() cannot run async steps when already inside async context. "
+        "Use await pipe.result_async() instead."
+    )
 
 
 class Pipe(Generic[T]):

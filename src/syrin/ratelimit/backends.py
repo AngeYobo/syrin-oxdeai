@@ -85,40 +85,38 @@ class SQLiteRateLimitBackend(RateLimitBackend):
     def _init_db(self) -> None:
         import sqlite3
 
-        conn = sqlite3.connect(str(self._path))
-        conn.execute(
+        with sqlite3.connect(str(self._path)) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rate_limits (
+                    key TEXT PRIMARY KEY,
+                    entries TEXT NOT NULL,
+                    last_updated REAL NOT NULL
+                )
             """
-            CREATE TABLE IF NOT EXISTS rate_limits (
-                key TEXT PRIMARY KEY,
-                entries TEXT NOT NULL,
-                last_updated REAL NOT NULL
             )
-        """
-        )
-        conn.commit()
-        conn.close()
+            conn.commit()
 
     def save(self, key: str, state: RateLimitState) -> None:
         import json
         import sqlite3
 
-        conn = sqlite3.connect(str(self._path))
-        conn.execute(
-            "INSERT OR REPLACE INTO rate_limits (key, entries, last_updated) VALUES (?, ?, ?)",
-            (key, json.dumps(state.entries), state.last_updated),
-        )
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(str(self._path)) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO rate_limits (key, entries, last_updated) VALUES (?, ?, ?)",
+                (key, json.dumps(state.entries), state.last_updated),
+            )
+            conn.commit()
 
     def load(self, key: str) -> RateLimitState | None:
         import json
         import sqlite3
 
-        conn = sqlite3.connect(str(self._path))
-        cursor = conn.execute("SELECT entries, last_updated FROM rate_limits WHERE key = ?", (key,))
-        row = cursor.fetchone()
-        conn.close()
-
+        with sqlite3.connect(str(self._path)) as conn:
+            cursor = conn.execute(
+                "SELECT entries, last_updated FROM rate_limits WHERE key = ?", (key,)
+            )
+            row = cursor.fetchone()
         if row:
             return RateLimitState(entries=json.loads(row[0]), last_updated=row[1])
         return None
@@ -126,18 +124,16 @@ class SQLiteRateLimitBackend(RateLimitBackend):
     def delete(self, key: str) -> None:
         import sqlite3
 
-        conn = sqlite3.connect(str(self._path))
-        conn.execute("DELETE FROM rate_limits WHERE key = ?", (key,))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(str(self._path)) as conn:
+            conn.execute("DELETE FROM rate_limits WHERE key = ?", (key,))
+            conn.commit()
 
     def exists(self, key: str) -> bool:
         import sqlite3
 
-        conn = sqlite3.connect(str(self._path))
-        cursor = conn.execute("SELECT 1 FROM rate_limits WHERE key = ? LIMIT 1", (key,))
-        exists = cursor.fetchone() is not None
-        conn.close()
+        with sqlite3.connect(str(self._path)) as conn:
+            cursor = conn.execute("SELECT 1 FROM rate_limits WHERE key = ? LIMIT 1", (key,))
+            exists = cursor.fetchone() is not None
         return exists
 
 

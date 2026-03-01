@@ -7,14 +7,14 @@ Provides automatic context management with:
 - Protocol for custom implementations
 
 Example:
-    >>> from Syrin import Agent, Model
+    >>> from syrin import Agent, Model
     >>> from syrin.context import Context
     >>>
     >>> agent = Agent(
     ...     model=Model("openai/gpt-4o"),
     ...     context=Context(max_tokens=80000)
     ... )
-    >>> result = agent.run("Hello")
+    >>> result = agent.response("Hello")
     >>> print(agent.context.stats)
 """
 

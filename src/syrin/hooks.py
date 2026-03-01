@@ -4,7 +4,7 @@ This module provides comprehensive documentation of all available hooks
 and their EventContext schemas.
 
 Usage:
-    from Syrin import Agent, Hook
+    from syrin import Agent, Hook
     from syrin.hooks import HookContext
 
     # Register handler for a hook

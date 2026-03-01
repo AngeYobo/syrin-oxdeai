@@ -4,7 +4,7 @@ Provides automatic retry with exponential backoff when hitting 429 errors.
 Integrates with the agent to automatically handle rate limit responses.
 """
 
-import time
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -61,8 +61,8 @@ class RetryConfig:
 class RateLimitRetryHandler:
     """Handles retry logic for rate limit errors.
 
-    can be used to wrap    This class operations that may hit rate limits
-       and automatically retry with exponential backoff.
+    This class can be used to wrap operations that may hit rate limits
+    and automatically retry with exponential backoff.
     """
 
     def __init__(self, config: RetryConfig | None = None):
@@ -108,7 +108,7 @@ class RateLimitRetryHandler:
         """Execute an operation with automatic retry on rate limits.
 
         Args:
-            operation: Async function to execute
+            operation: Async function to execute (must return awaitable when called)
             is_rate_limit: Optional function to check if result is a rate limit error
 
         Returns:
@@ -117,16 +117,20 @@ class RateLimitRetryHandler:
         Raises:
             Last exception if all retries exhausted
         """
+        from collections.abc import Awaitable
+
         last_error: Exception | None = None
 
         for attempt in range(self.config.max_retries + 1):
             try:
                 result = operation()
+                if isinstance(result, Awaitable):
+                    result = await result
 
-                # Check if result indicates rate limit (sync or async)
+                # Check if result indicates rate limit
                 if is_rate_limit and is_rate_limit(result) and self.should_retry(attempt, 429):
                     delay = self.calculate_backoff(attempt)
-                    time.sleep(delay)
+                    await asyncio.sleep(delay)
                     continue
 
                 return result
@@ -139,7 +143,7 @@ class RateLimitRetryHandler:
 
                 if is_ratelimit and self.should_retry(attempt):
                     delay = self.calculate_backoff(attempt)
-                    time.sleep(delay)
+                    await asyncio.sleep(delay)
                 else:
                     raise
 

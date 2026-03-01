@@ -3,7 +3,26 @@
 from __future__ import annotations
 
 import json
+import threading
 from typing import Any
+
+_client_cache: dict[tuple[str, str], Any] = {}
+_cache_lock = threading.Lock()
+
+
+def _get_client(api_key: str | None, base_url: str | None = None) -> Any:
+    """Get or create cached AsyncAnthropic client per (api_key, base_url)."""
+    import anthropic
+
+    key = (api_key or "", base_url or "")
+    with _cache_lock:
+        if key not in _client_cache:
+            kwargs: dict[str, Any] = {"api_key": api_key}
+            if base_url:
+                kwargs["base_url"] = base_url
+            _client_cache[key] = anthropic.AsyncAnthropic(**kwargs)
+        return _client_cache[key]
+
 
 from syrin.enums import MessageRole
 from syrin.exceptions import ProviderError
@@ -116,7 +135,10 @@ class AnthropicProvider(Provider):
         **kwargs: Any,
     ) -> ProviderResponse:
         try:
-            import anthropic
+            import importlib.util
+
+            if importlib.util.find_spec("anthropic") is None:
+                raise ImportError("anthropic package not found")
         except ImportError as e:
             raise ProviderError(
                 "Anthropic provider requires the anthropic package. "
@@ -134,7 +156,7 @@ class AnthropicProvider(Provider):
                 "API key required for Anthropic. Pass api_key when creating the Model: "
                 "Model.Anthropic('claude-sonnet', api_key='sk-ant-...') or api_key=os.getenv('ANTHROPIC_API_KEY')"
             )
-        client = anthropic.AsyncAnthropic(api_key=api_key)
+        client = _get_client(api_key, model.base_url)
 
         # Anthropic API expects model name without "anthropic/" prefix
         api_model = (

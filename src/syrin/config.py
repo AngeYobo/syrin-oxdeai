@@ -14,6 +14,7 @@ class GlobalConfig:
 
     Attributes:
         trace: Whether tracing is enabled. Set via configure(trace=True).
+        debug: Whether debug mode is enabled. Set via configure(debug=True).
         default_model: Default ModelConfig when none specified.
         default_api_key: Default API key (rarely used; pass per Model).
     """
@@ -21,6 +22,7 @@ class GlobalConfig:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._trace: bool = False
+        self._debug: bool = False
         self._default_model: ModelConfig | None = None
         self._default_api_key: str | None = None
         self._env_prefix = "SYRIN_"
@@ -30,8 +32,6 @@ class GlobalConfig:
         """Load configuration from environment variables."""
         if os.environ.get(f"{self._env_prefix}TRACE", "").lower() in ("1", "true", "yes"):
             self._trace = True
-        if os.environ.get(f"{self._env_prefix}TRACE", ""):
-            pass
         # API key is never auto-loaded from env; user must pass via configure() or Model(api_key=...)
 
     @property
@@ -43,6 +43,16 @@ class GlobalConfig:
     def trace(self, value: bool) -> None:
         with self._lock:
             self._trace = value
+
+    @property
+    def debug(self) -> bool:
+        """Whether debug mode is enabled."""
+        return self._debug
+
+    @debug.setter
+    def debug(self, value: bool) -> None:
+        with self._lock:
+            self._debug = value
 
     @property
     def default_model(self) -> ModelConfig | None:
@@ -93,6 +103,7 @@ def configure(**kwargs: Any) -> None:
 
     Args:
         trace: Enable tracing (default: False)
+        debug: Enable debug mode (default: False)
         default_model: Default model to use (Model or ModelConfig)
         default_api_key: Default API key to use
 

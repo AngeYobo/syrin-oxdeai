@@ -108,7 +108,16 @@ def _get_agent_loop() -> asyncio.AbstractEventLoop:
     if _agent_loop is None or _agent_loop.is_closed():
         _agent_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(_agent_loop)
-        _agent_loop.set_exception_handler(lambda _loop, _ctx: None)
+
+        def _exception_handler(loop: asyncio.AbstractEventLoop, ctx: dict[str, Any]) -> None:
+            """Log unhandled exceptions; do not swallow."""
+            exc = ctx.get("exception")
+            if exc is not None:
+                _log.exception("Unhandled exception in agent event loop: %s", exc)
+            else:
+                _log.error("Unhandled event loop context: %s", ctx)
+
+        _agent_loop.set_exception_handler(_exception_handler)
     return _agent_loop
 
 
@@ -671,24 +680,24 @@ class Agent(Servable, metaclass=_AgentMeta):
 
         if (
             memory is not None
+            and memory is not True
             and memory is not False
             and not isinstance(memory, (Memory, ConversationMemory))
         ):
             raise TypeError(
-                f"memory must be Memory, ConversationMemory, False, or None, got {type(memory).__name__}. "
-                "Use Memory(types=[...], top_k=10), BufferMemory(), or False to disable."
+                f"memory must be Memory, ConversationMemory, True, False, or None, got {type(memory).__name__}. "
+                "Use Memory(types=[...], top_k=10), BufferMemory(), True for defaults, or False/None to disable."
             )
-        if memory is None:
-            # Default: enable persistent memory with sensible defaults
+        if memory is None or memory is False:
+            self._persistent_memory = None
+            self._memory_backend = None
+            self._conversation_memory = None
+        elif memory is True:
             self._persistent_memory = Memory(
                 types=[MemoryType.CORE, MemoryType.EPISODIC],
                 top_k=10,
             )
             self._memory_backend = get_backend(MemoryBackend.MEMORY)
-        elif memory is False:
-            # Explicitly disable persistent memory
-            self._persistent_memory = None
-            self._memory_backend = None
             self._conversation_memory = None
         elif isinstance(memory, Memory):
             self._persistent_memory = memory
@@ -736,6 +745,8 @@ class Agent(Servable, metaclass=_AgentMeta):
             )
         self._loop = loop_instance
         self._last_iteration: int = 0
+        self._thread_id: str | None = None  # Set by run context; used in prompt vars
+        self._child_count: int = 0
 
         # Guardrails setup
         if guardrails is None or (isinstance(guardrails, list) and len(guardrails) == 0):
@@ -861,6 +872,11 @@ class Agent(Servable, metaclass=_AgentMeta):
             return self._conversation_memory.get_messages()
         return []
 
+    @property
+    def checkpointer(self) -> Checkpointer | None:
+        """Checkpointer for manual save/load. None if checkpointing disabled."""
+        return self._checkpointer
+
     def save_checkpoint(self, name: str | None = None, reason: str | None = None) -> str | None:
         """Save a snapshot of the agent's current state for later restore.
 
@@ -889,7 +905,7 @@ class Agent(Servable, metaclass=_AgentMeta):
 
         agent_name = name or self._agent_name
         state = {
-            "iteration": self._run_report.tokens.total_tokens,
+            "iteration": self.iteration,
             "messages": [],  # Could include conversation history
             "memory_data": {},
             "budget_state": (
@@ -1498,7 +1514,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             elif query or memory_type:
                 memories = self._memory_backend.list(memory_type)
                 for mem in memories:
-                    if query and query.lower() in mem.content.lower():
+                    if query is None or (query and query.lower() in mem.content.lower()):
                         self._memory_backend.delete(mem.id)
                         deleted += 1
 
@@ -1828,7 +1844,11 @@ class Agent(Servable, metaclass=_AgentMeta):
 
         if task:
             t0 = time.perf_counter()
-            result = child_agent.response(task)
+            try:
+                result = child_agent.response(task)
+            finally:
+                if use_instance_limit and self._child_count > 0:
+                    self._child_count -= 1
             duration = time.perf_counter() - t0
             if not getattr(child_agent, "_budget_tracker_shared", False):
                 self._update_parent_budget(result.cost)
@@ -2338,6 +2358,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                 message=msg,
             )
             on_exceeded(ctx)
+        # Note: Callback must raise to stop run. warn_on_exceeded returns to continue; raise_on_exceeded raises.
 
     def _check_and_apply_rate_limit(self) -> None:
         """Check rate limits and apply threshold actions (switch model, wait, warn, stop).
@@ -2410,10 +2431,17 @@ class Agent(Servable, metaclass=_AgentMeta):
     async def _complete_async(
         self, messages: list[Message], tools: list[ToolSpec] | None
     ) -> ProviderResponse:
-        """Async internal method to call provider."""
+        """Async internal method to call LLM. Uses model.acomplete when fallbacks or transformers needed."""
         provider_kwargs: dict[str, Any] = {}
         if self._model is not None and hasattr(self._model, "_provider_kwargs"):
             provider_kwargs = dict(getattr(self._model, "_provider_kwargs", {}))
+        # Use model.acomplete when model has fallbacks or response transformer (same provider instance)
+        if self._model is not None:
+            has_fallback = bool(getattr(self._model, "fallback", None))
+            has_transformer = bool(getattr(self._model, "_transformer", None))
+            if has_fallback or has_transformer:
+                result = await self._model.acomplete(messages, tools=tools, **provider_kwargs)
+                return cast(ProviderResponse, result)
         return await self._provider.complete(
             messages=messages, model=self._model_config, tools=tools, **provider_kwargs
         )

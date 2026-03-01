@@ -90,6 +90,14 @@ class EventBus(Generic[T]):
             self._listeners[event_type] = []
         self._listeners[event_type].append(handler)  # type: ignore[arg-type]
 
+    def on(
+        self,
+        event_type: type[T],
+        handler: Callable[[T], None],
+    ) -> None:
+        """Alias for subscribe(). Register handler for a domain event type."""
+        self.subscribe(event_type, handler)
+
     def emit(self, event: DomainEvent) -> None:
         """Emit a domain event to all subscribers."""
         t = type(event)

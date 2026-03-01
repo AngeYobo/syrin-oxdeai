@@ -28,12 +28,16 @@ from syrin.memory.config import MemoryEntry
 
 
 class ChromaBackend:
-    """Chroma-based storage for memories with semantic search (vector embeddings).
+    """Chroma-based storage for memories with vector search.
 
     Requires: pip install chromadb
 
+    Note: Default _get_embedding uses MD5 hash-based pseudo-embeddings.
+    These do NOT provide semantic similarity. Override _get_embedding for
+    real semantic search (e.g. sentence-transformers).
+
     Features:
-    - Semantic search using embeddings
+    - Vector search (override _get_embedding for semantic similarity)
     - Persistent storage
     - Fast similarity search
     - Lightweight

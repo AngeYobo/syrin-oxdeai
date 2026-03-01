@@ -3,7 +3,23 @@
 from __future__ import annotations
 
 import json
+import threading
 from typing import Any
+
+_client_cache: dict[tuple[str, str], Any] = {}
+_cache_lock = threading.Lock()
+
+
+def _get_client(api_key: str | None, base_url: str | None) -> Any:
+    """Get or create cached AsyncOpenAI client per (api_key, base_url)."""
+    from openai import AsyncOpenAI
+
+    key = (api_key or "", base_url or "")
+    with _cache_lock:
+        if key not in _client_cache:
+            _client_cache[key] = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        return _client_cache[key]
+
 
 from syrin.enums import MessageRole
 from syrin.exceptions import ProviderError
@@ -84,7 +100,10 @@ class OpenAIProvider(Provider):
         **kwargs: Any,
     ) -> ProviderResponse:
         try:
-            from openai import AsyncOpenAI
+            import importlib.util
+
+            if importlib.util.find_spec("openai") is None:
+                raise ImportError("openai package not found")
         except ImportError as e:
             raise ProviderError(
                 "OpenAI provider requires the openai package. "
@@ -98,10 +117,7 @@ class OpenAIProvider(Provider):
                 "Model.OpenAI('gpt-4o', api_key='sk-...') or api_key=os.getenv('OPENAI_API_KEY')"
             )
         api_messages = [_message_to_openai(m) for m in messages]
-        client = AsyncOpenAI(
-            api_key=api_key,
-            base_url=model.base_url,
-        )
+        client = _get_client(api_key, model.base_url)
         request_kwargs: dict[str, Any] = {
             "model": model.model_id.split("/")[-1],  # Strip provider prefix
             "messages": api_messages,

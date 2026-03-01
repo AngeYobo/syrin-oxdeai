@@ -29,14 +29,19 @@ from syrin.memory.config import MemoryEntry
 
 
 class QdrantBackend:
-    """Qdrant-based storage for memories with semantic search (vector embeddings).
+    """Qdrant-based storage for memories with vector search.
 
     Requires: pip install qdrant-client
 
     Features:
-    - Semantic search using embeddings
+    - Vector search (override _get_embedding for semantic similarity)
     - Persistent storage
     - Fast similarity search
+
+    Note: Default _get_embedding uses MD5 hash-based pseudo-embeddings.
+    These do NOT provide semantic similarity — similar texts have unrelated vectors.
+    For real semantic search, override _get_embedding with sentence-transformers
+    or another embedding model.
     """
 
     def __init__(

@@ -197,20 +197,20 @@ class AuditEventType(StrEnum):
     MEMORY_RECALL = "memory_recall"
     MEMORY_FORGET = "memory_forget"
 
-    # Pipeline (static)
-    PIPELINE_START = "pipeline_start"
-    PIPELINE_END = "pipeline_end"
-    PIPELINE_AGENT_START = "pipeline_agent_start"
-    PIPELINE_AGENT_COMPLETE = "pipeline_agent_complete"
+    # Pipeline (static) — values match Hook for single source of truth
+    PIPELINE_START = "pipeline.start"
+    PIPELINE_END = "pipeline.end"
+    PIPELINE_AGENT_START = "pipeline.agent.start"
+    PIPELINE_AGENT_COMPLETE = "pipeline.agent.complete"
 
-    # Dynamic Pipeline
-    DYNAMIC_PIPELINE_START = "dynamic_pipeline_start"
-    DYNAMIC_PIPELINE_PLAN = "dynamic_pipeline_plan"
-    DYNAMIC_PIPELINE_EXECUTE = "dynamic_pipeline_execute"
-    DYNAMIC_PIPELINE_AGENT_SPAWN = "dynamic_pipeline_agent_spawn"
-    DYNAMIC_PIPELINE_AGENT_COMPLETE = "dynamic_pipeline_agent_complete"
-    DYNAMIC_PIPELINE_END = "dynamic_pipeline_end"
-    DYNAMIC_PIPELINE_ERROR = "dynamic_pipeline_error"
+    # Dynamic Pipeline — values match Hook
+    DYNAMIC_PIPELINE_START = "dynamic.pipeline.start"
+    DYNAMIC_PIPELINE_PLAN = "dynamic.pipeline.plan"
+    DYNAMIC_PIPELINE_EXECUTE = "dynamic.pipeline.execute"
+    DYNAMIC_PIPELINE_AGENT_SPAWN = "dynamic.pipeline.agent.spawn"
+    DYNAMIC_PIPELINE_AGENT_COMPLETE = "dynamic.pipeline.agent.complete"
+    DYNAMIC_PIPELINE_END = "dynamic.pipeline.end"
+    DYNAMIC_PIPELINE_ERROR = "dynamic.pipeline.error"
 
     # Serve
     SERVE_REQUEST_START = "serve_request_start"

@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import re
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -28,7 +29,8 @@ def _lock_file(f: Any) -> None:
     if sys.platform == "win32" and msvcrt is not None:
         try:
             f.seek(0)
-            msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
+            size = os.path.getsize(f.name) if hasattr(f, "name") and f.name else 1
+            msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, max(1, size))
         except (OSError, AttributeError):
             pass
     elif fcntl is not None:
@@ -41,7 +43,8 @@ def _unlock_file(f: Any) -> None:
     if sys.platform == "win32" and msvcrt is not None:
         try:
             f.seek(0)
-            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            size = os.path.getsize(f.name) if hasattr(f, "name") and f.name else 1
+            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, max(1, size))
         except (OSError, AttributeError):
             pass
     elif fcntl is not None:
@@ -99,7 +102,13 @@ class FileBudgetStore(BudgetStore):
         self._path = Path(path)
         self._single_file = single_file
 
+    def _validate_key(self, key: str) -> None:
+        """Reject keys that could cause path traversal."""
+        if not re.match(r"^[a-zA-Z0-9_.-]+$", key):
+            raise ValueError(f"Invalid budget store key (path traversal): {key!r}")
+
     def _file_for(self, key: str) -> Path:
+        self._validate_key(key)
         if self._single_file:
             return self._path
         return self._path / f"{key}.json"

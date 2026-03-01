@@ -4,7 +4,7 @@ This module provides the Events class for registering and triggering
 hooks throughout the agent lifecycle.
 
 Usage:
-    from Syrin import Agent, Hook
+    from syrin import Agent, Hook
     from syrin.events import Events, EventContext
 
     # Register handler for a hook

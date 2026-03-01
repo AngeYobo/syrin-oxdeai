@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from syrin.budget import BudgetExceededContext
@@ -59,30 +59,35 @@ class MemoryStore:
         """Create a span for observability (if available)."""
         span_data: dict[str, Any] = {
             "operation": operation,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         try:
             from syrin.observability import (
                 SemanticAttributes,
+                SpanKind,
                 get_tracer,
             )
 
             tracer = get_tracer()
-            # span() is a context manager, so we need to handle it differently
-            # For now, just store the tracer reference
-            span_data["_tracer"] = tracer
-            span_data["_attributes"] = {SemanticAttributes.MEMORY_OPERATION: operation}
+            cm = tracer.span(
+                f"memory.{operation}",
+                kind=SpanKind.MEMORY,
+                attributes={SemanticAttributes.MEMORY_OPERATION: operation},
+            )
+            span = cm.__enter__()
+            span_data["_span"] = span
+            span_data["_span_cm"] = cm
         except Exception:
             pass
         return span_data
 
     def _end_span(self, span_data: dict[str, Any], **attrs: Any) -> None:
         """End a span and set attributes."""
-        if "_span" in span_data:
+        if "_span" in span_data and "_span_cm" in span_data:
             span = span_data["_span"]
             for key, value in attrs.items():
                 span.set_attribute(key, value)
-            span.end()
+            span_data["_span_cm"].__exit__(None, None, None)
 
     def add(
         self,

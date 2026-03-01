@@ -14,7 +14,7 @@ This module provides CLI features for running and debugging Syrin agents:
    Users don't need to write their own hook handlers.
 
    Example:
-       >>> from Syrin import Agent
+       >>> from syrin import Agent
        >>> from syrin.cli import WorkflowDebugger
 
        >>> debugger = WorkflowDebugger()
@@ -113,7 +113,7 @@ class WorkflowDebugger:
     - Export to JSONL for further analysis
 
     Example - Basic usage with Agent:
-        >>> from Syrin import Agent
+        >>> from syrin import Agent
         >>> from syrin.cli import WorkflowDebugger
 
         >>> debugger = WorkflowDebugger(verbose=True)

@@ -77,6 +77,11 @@ class CircuitBreaker:
     def fallback(self) -> str | Any | None:
         return self._fallback
 
+    @property
+    def state(self) -> CircuitState:
+        """Current circuit state (CLOSED, OPEN, or HALF_OPEN)."""
+        return self._state
+
     def get_state(self) -> CircuitBreakerState:
         """Return current circuit breaker state."""
         return CircuitBreakerState(

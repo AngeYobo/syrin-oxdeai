@@ -217,4 +217,5 @@ def _response_from_loop_result(
         iterations=result.iterations,
         structured=structured,
         report=agent._run_report,
+        raw_response=result.raw_response,
     )

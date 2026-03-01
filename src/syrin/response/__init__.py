@@ -382,6 +382,7 @@ class Response(Generic[T]):
         report: Full AgentReport (guardrails, memory, budget, etc.).
         context_stats: Context usage stats for this call.
         context: Context used (when overridden per-call).
+        raw_response: Provider-specific raw response (parsed Pydantic for structured output).
 
     For structured output (output=Output(MyModel)):
         result.data — Parsed dict
@@ -411,6 +412,7 @@ class Response(Generic[T]):
     report: AgentReport = field(default_factory=AgentReport)
     context_stats: ContextStats | None = None  # per-call context stats
     context: Context | None = None  # Context used for this call (overrides agent's when passed)
+    raw_response: Any = None  # Provider raw response; parsed Pydantic for structured output
 
     @property
     def data(self) -> dict[str, Any] | None:

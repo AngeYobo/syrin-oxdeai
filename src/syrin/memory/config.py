@@ -27,10 +27,20 @@ class Decay(BaseModel):
     Memories lose importance over time unless reinforced by access.
     Use either ``rate`` (per-hour decay multiplier) or ``half_life_hours``
     (hours until importance halves); if both are set, ``half_life_hours`` wins.
+
+    Rate semantics differ by strategy:
+    - EXPONENTIAL: rate = multiplier per hour (0.995 ≈ 0.5% loss/hour).
+    - LINEAR: rate = fraction lost per 24h (0.1 = 10% lost/day; 0.995 = 99.5% lost/day).
+    - LOGARITHMIC: rate controls decay curve steepness.
     """
 
     strategy: DecayStrategy = DecayStrategy.EXPONENTIAL
-    rate: float = Field(0.995, gt=0.0, le=1.0)
+    rate: float = Field(
+        0.995,
+        gt=0.0,
+        le=1.0,
+        description="Per-strategy: EXPONENTIAL=per-hour multiplier; LINEAR=fraction lost per 24h; LOGARITHMIC=steepness.",
+    )
     half_life_hours: float | None = Field(
         None,
         gt=0,

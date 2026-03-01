@@ -210,7 +210,7 @@ class TestSpawn:
 
     @patch("syrin.agent._resolve_provider")
     def test_spawn_max_children_limit(self, mock_get_provider):
-        """Test spawn respects max_children limit."""
+        """Test spawn respects max_children limit (concurrent). Decrements when child completes."""
         mock_get_provider.return_value = create_mock_provider()
 
         class Parent(Agent):
@@ -222,11 +222,19 @@ class TestSpawn:
         parent = Parent()
         parent._max_children = 2
 
+        # Spawn 2 with task — each completes before returning, so _child_count stays 0 after each
         parent.spawn(Child, "Task 1")
         parent.spawn(Child, "Task 2")
+        # Can spawn 3rd (previous children completed; _child_count decremented)
+        r3 = parent.spawn(Child, "Task 3")
+        assert r3 is not None
 
+        # Test concurrent limit: spawn 2 without task (children "in flight"), 3rd should fail
+        parent._child_count = 0
+        _c1 = parent.spawn(Child)  # no task — returns agent, _child_count=1
+        _c2 = parent.spawn(Child)  # _child_count=2
         with pytest.raises(RuntimeError, match="max children"):
-            parent.spawn(Child, "Task 3")
+            parent.spawn(Child)  # would be 3rd concurrent
 
     @patch("syrin.agent._resolve_provider")
     def test_spawn_parallel(self, mock_get_provider):

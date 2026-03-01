@@ -18,7 +18,7 @@ from __future__ import annotations
 import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from syrin.observability import Span
@@ -61,7 +61,7 @@ class MetricAggregator:
             points = list(self._values.get(name, []))
 
         if window:
-            cutoff = datetime.now() - window
+            cutoff = datetime.now(timezone.utc) - window
             points = [p for p in points if p.timestamp >= cutoff]
 
         if tags:

@@ -91,15 +91,16 @@ def test_file_store_concurrent_save_single_file() -> None:
         assert lb.current_run_cost == 2.0
 
 
-def test_file_store_save_invalid_key_raises_or_succeeds() -> None:
-    """Save with empty key is allowed (implementation-defined)."""
+def test_file_store_save_invalid_key_raises() -> None:
+    """Save with empty or path-traversal key raises ValueError."""
     with TemporaryDirectory() as tmp:
         path = Path(tmp) / "budget.json"
         store = FileBudgetStore(path, single_file=True)
         tracker = BudgetTracker()
-        store.save("", tracker)
-        loaded = store.load("")
-        assert loaded is not None
+        with pytest.raises(ValueError, match="Invalid budget store key"):
+            store.save("", tracker)
+        with pytest.raises(ValueError, match="Invalid budget store key"):
+            store.save("../../etc/passwd", tracker)
 
 
 # =============================================================================

@@ -131,6 +131,7 @@ class RateLimit(BaseModel):
     day: float | None = Field(default=None, ge=0, description="Max USD per day")
     week: float | None = Field(default=None, ge=0, description="Max USD per week")
     month: float | None = Field(default=None, ge=0, description="Max USD per month")
+
     month_days: int = Field(
         default=30, ge=1, le=31, description="Number of days for month window (default 30)"
     )
@@ -138,6 +139,19 @@ class RateLimit(BaseModel):
         default=False,
         description="If True, 'month' window is current calendar month; else last month_days.",
     )
+
+    @property
+    def window(self) -> str | None:
+        """Convenience: first configured window (hour, day, week, month)."""
+        if self.hour is not None:
+            return "hour"
+        if self.day is not None:
+            return "day"
+        if self.week is not None:
+            return "week"
+        if self.month is not None:
+            return "month"
+        return None
 
 
 class TokenRateLimit(BaseModel):
@@ -195,11 +209,11 @@ class TokenLimits(BaseModel):
     The agent's budget tracker enforces limits after each LLM call.
 
     Example:
-        >>> from syrin import Agent, Context, ContextBudget, Model
-        >>> from syrin.budget import TokenRateLimit, raise_on_exceeded
+        >>> from syrin import Agent, Context, Model
+        >>> from syrin.budget import TokenLimits, TokenRateLimit, raise_on_exceeded
         >>> agent = Agent(
         ...     model=Model("openai/gpt-4o"),
-        ...     context=Context(budget=ContextBudget(run=50_000, on_exceeded=raise_on_exceeded)),
+        ...     context=Context(budget=TokenLimits(run=50_000, on_exceeded=raise_on_exceeded)),
         ... )
     """
 
@@ -218,6 +232,11 @@ class TokenLimits(BaseModel):
         default=None,
         description="Called when a token limit is exceeded. Raise to stop the run; return to continue (e.g. warn). Same as Budget.on_exceeded.",
     )
+
+    @property
+    def per_hour(self) -> int | None:
+        """Convenience: max tokens per hour (from per.hour)."""
+        return self.per.hour if self.per else None
 
 
 class Budget(BaseModel):
@@ -496,6 +515,8 @@ class BudgetTracker:
 
     def record(self, cost: CostInfo) -> None:
         """Add a cost entry and update all windows. Prunes entries older than month window."""
+        if cost.cost_usd < 0:
+            raise ValueError(f"cost_usd cannot be negative, got {cost.cost_usd}")
         with self._lock:
             tokens = cost.token_usage.total_tokens if cost.token_usage else 0
             self._cost_history.append(
@@ -685,8 +706,8 @@ class BudgetTracker:
             )
             with self._lock:
                 run_and_reserved = self.current_run_cost + self._reserved
-            if effective_run is not None and run_and_reserved >= effective_run:
-                return CheckBudgetResult(BudgetStatus.EXCEEDED, BudgetLimitType.RUN)
+                if effective_run is not None and run_and_reserved >= effective_run:
+                    return CheckBudgetResult(BudgetStatus.EXCEEDED, BudgetLimitType.RUN)
         # Token limits: only from token_limits (Budget is USD only)
         if (
             token_limits is not None

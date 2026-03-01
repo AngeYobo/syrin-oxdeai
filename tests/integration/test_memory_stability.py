@@ -25,7 +25,7 @@ class TestPersistentMemoryRememberRecallForget:
     def test_remember_returns_id_and_recall_returns_content(self) -> None:
         """remember() returns memory id; recall() returns stored entries."""
         model = Model("anthropic/claude-3-5-sonnet")
-        agent = Agent(model=model, system_prompt="Test.")
+        agent = Agent(model=model, system_prompt="Test.", memory=True)
         mid = agent.remember("User name is Alice", memory_type=MemoryType.CORE, importance=1.0)
         assert isinstance(mid, str)
         assert len(mid) > 0
@@ -37,7 +37,7 @@ class TestPersistentMemoryRememberRecallForget:
     def test_forget_by_id_removes_memory(self) -> None:
         """forget(memory_id=...) removes the entry; recall no longer returns it."""
         model = Model("anthropic/claude-3-5-sonnet")
-        agent = Agent(model=model, system_prompt="Test.")
+        agent = Agent(model=model, system_prompt="Test.", memory=True)
         mid = agent.remember("Secret token XYZ123", memory_type=MemoryType.EPISODIC)
         entries_before = agent.recall("XYZ123", limit=10)
         assert any("XYZ123" in e.content for e in entries_before)
@@ -49,7 +49,7 @@ class TestPersistentMemoryRememberRecallForget:
     def test_forget_by_query_removes_matching_entries(self) -> None:
         """forget(query=...) removes entries whose content contains the query."""
         model = Model("anthropic/claude-3-5-sonnet")
-        agent = Agent(model=model, system_prompt="Test.")
+        agent = Agent(model=model, system_prompt="Test.", memory=True)
         agent.remember("Temporary note: delete me", memory_type=MemoryType.EPISODIC)
         agent.remember("Another delete me entry", memory_type=MemoryType.EPISODIC)
         deleted = agent.forget(query="delete me")
@@ -60,7 +60,7 @@ class TestPersistentMemoryRememberRecallForget:
     def test_multiple_remember_recall_sequence_consistent(self) -> None:
         """Multiple remember/recall in sequence do not corrupt state."""
         model = Model("anthropic/claude-3-5-sonnet")
-        agent = Agent(model=model, system_prompt="Test.")
+        agent = Agent(model=model, system_prompt="Test.", memory=True)
         ids = []
         for i in range(3):
             mid = agent.remember(
@@ -116,7 +116,7 @@ class TestMemoryEdgeCases:
     def test_recall_empty_query_lists_all_up_to_limit(self) -> None:
         """recall() with no query returns list of entries up to limit."""
         model = Model("anthropic/claude-3-5-sonnet")
-        agent = Agent(model=model, system_prompt="Test.")
+        agent = Agent(model=model, system_prompt="Test.", memory=True)
         agent.remember("A", memory_type=MemoryType.EPISODIC)
         agent.remember("B", memory_type=MemoryType.EPISODIC)
         entries = agent.recall(limit=5)
@@ -126,7 +126,7 @@ class TestMemoryEdgeCases:
     def test_forget_nonexistent_id_does_not_crash(self) -> None:
         """forget(memory_id="nonexistent") does not raise; returns 1 (backend may still delete)."""
         model = Model("anthropic/claude-3-5-sonnet")
-        agent = Agent(model=model, system_prompt="Test.")
+        agent = Agent(model=model, system_prompt="Test.", memory=True)
         deleted = agent.forget(memory_id="nonexistent-uuid-12345")
         assert deleted == 1
 
@@ -139,7 +139,7 @@ class TestRecallContract:
         from syrin.memory.config import MemoryEntry
 
         model = Model("anthropic/claude-3-5-sonnet")
-        agent = Agent(model=model, system_prompt="Test.")
+        agent = Agent(model=model, system_prompt="Test.", memory=True)
         agent.remember("User name is Bob", memory_type=MemoryType.CORE, importance=0.9)
         entries = agent.recall("Bob", memory_type=MemoryType.CORE, limit=5)
         assert isinstance(entries, list)
@@ -161,7 +161,7 @@ class TestRecallContract:
     def test_agent_recall_with_query_none_lists_all_up_to_limit(self) -> None:
         """recall(query=None, limit=N) lists all entries up to N."""
         model = Model("anthropic/claude-3-5-sonnet")
-        agent = Agent(model=model, system_prompt="Test.")
+        agent = Agent(model=model, system_prompt="Test.", memory=True)
         agent.remember("A", memory_type=MemoryType.EPISODIC)
         agent.remember("B", memory_type=MemoryType.EPISODIC)
         entries = agent.recall(limit=5)

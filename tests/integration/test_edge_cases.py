@@ -98,7 +98,7 @@ class TestNoMemoryBackendConfigured:
         from syrin.enums import MemoryType
 
         model = Model("anthropic/claude-3-5-sonnet")
-        agent = Agent(model=model, system_prompt="Test.")
+        agent = Agent(model=model, system_prompt="Test.", memory=True)
         agent.remember("Fact", memory_type=MemoryType.EPISODIC)
         entries = agent.recall(limit=5)
         assert isinstance(entries, list)

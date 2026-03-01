@@ -36,7 +36,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
 
@@ -114,7 +114,7 @@ class Session:
     """
 
     id: str
-    start_time: datetime = field(default_factory=datetime.now)
+    start_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = field(default_factory=dict)
     span_count: int = 0
 
@@ -142,7 +142,7 @@ class Span:
     session_id: str | None = None
 
     # Timing
-    start_time: datetime = field(default_factory=datetime.now)
+    start_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     end_time: datetime | None = None
 
     # Status and result
@@ -165,7 +165,7 @@ class Span:
     @property
     def duration_ms(self) -> float:
         """Calculate duration in milliseconds."""
-        end = self.end_time or datetime.now()
+        end = self.end_time or datetime.now(timezone.utc)
         return (end - self.start_time).total_seconds() * 1000
 
     @property
@@ -193,7 +193,7 @@ class Span:
         self.events.append(
             {
                 "name": name,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "attributes": attributes or {},
             }
         )
@@ -217,7 +217,7 @@ class Span:
 
     def end(self, status: SpanStatus | None = None, message: str | None = None) -> None:
         """Mark the span as ended."""
-        self.end_time = datetime.now()
+        self.end_time = datetime.now(timezone.utc)
         if status:
             self.set_status(status, message)
         elif self.status == SpanStatus.PENDING:
@@ -759,7 +759,7 @@ def agent_span(
 
     Example:
         >>> with agent_span("research_agent", user_id="123") as span:
-        ...     result = agent.run(query)
+        ...     result = agent.response(query)
     """
     return trace.span(
         f"agent.{name}",

@@ -1,7 +1,7 @@
 """Rate limiting with proactive threshold actions.
 
 Example:
-    >>> from Syrin import Agent, Model
+    >>> from syrin import Agent, Model
     >>> from syrin.ratelimit import APIRateLimit
     >>> from syrin.threshold import RateLimitThreshold
     >>> from syrin.enums import ThresholdMetric

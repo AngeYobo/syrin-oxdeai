@@ -190,66 +190,67 @@ class SQLiteCheckpointBackend(CheckpointBackendProtocol):
     def _ensure_tables(self) -> None:
         """Create tables if they don't exist."""
         os.makedirs(os.path.dirname(self._path) or ".", exist_ok=True)
-        conn = sqlite3.connect(self._path)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS checkpoints (
-                checkpoint_id TEXT PRIMARY KEY,
-                agent_name TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                state_json TEXT NOT NULL
-            )
-        """)
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_agent_name ON checkpoints(agent_name)
-        """)
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self._path) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS checkpoints (
+                    checkpoint_id TEXT PRIMARY KEY,
+                    agent_name TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    state_json TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_agent_name ON checkpoints(agent_name)
+            """)
+            conn.commit()
 
     def save(self, state: CheckpointState) -> None:
         """Save checkpoint to SQLite."""
-        conn = sqlite3.connect(self._path)
-        state_json = state.model_dump_json()
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO checkpoints (checkpoint_id, agent_name, created_at, state_json)
-            VALUES (?, ?, ?, ?)
-            """,
-            (state.checkpoint_id, state.agent_name, state.created_at.isoformat(), state_json),
-        )
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self._path) as conn:
+            state_json = state.model_dump_json()
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO checkpoints (checkpoint_id, agent_name, created_at, state_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (state.checkpoint_id, state.agent_name, state.created_at.isoformat(), state_json),
+            )
+            conn.commit()
 
     def load(self, checkpoint_id: str) -> CheckpointState | None:
         """Load checkpoint from SQLite."""
-        conn = sqlite3.connect(self._path)
-        cursor = conn.execute(
-            "SELECT state_json FROM checkpoints WHERE checkpoint_id = ?",
-            (checkpoint_id,),
-        )
-        row = cursor.fetchone()
-        conn.close()
-
+        with sqlite3.connect(self._path) as conn:
+            cursor = conn.execute(
+                "SELECT state_json FROM checkpoints WHERE checkpoint_id = ?",
+                (checkpoint_id,),
+            )
+            row = cursor.fetchone()
         if row is None:
             return None
         return CheckpointState.model_validate_json(row[0])
 
     def list(self, agent_name: str) -> list[str]:
         """List checkpoint IDs for an agent."""
-        conn = sqlite3.connect(self._path)
-        cursor = conn.execute(
-            "SELECT checkpoint_id FROM checkpoints WHERE agent_name = ? ORDER BY created_at",
-            (agent_name,),
-        )
-        results = [row[0] for row in cursor.fetchall()]
-        conn.close()
+        with sqlite3.connect(self._path) as conn:
+            cursor = conn.execute(
+                "SELECT checkpoint_id FROM checkpoints WHERE agent_name = ? ORDER BY created_at",
+                (agent_name,),
+            )
+            results = [row[0] for row in cursor.fetchall()]
         return results
 
     def delete(self, checkpoint_id: str) -> None:
         """Delete a checkpoint."""
-        conn = sqlite3.connect(self._path)
-        conn.execute("DELETE FROM checkpoints WHERE checkpoint_id = ?", (checkpoint_id,))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self._path) as conn:
+            conn.execute("DELETE FROM checkpoints WHERE checkpoint_id = ?", (checkpoint_id,))
+            conn.commit()
+
+
+def _sanitize_checkpoint_id(id_str: str) -> str:
+    """Reject path traversal in checkpoint IDs."""
+    if ".." in id_str or "/" in id_str or "\\" in id_str:
+        raise ValueError(f"Invalid checkpoint ID (path traversal): {id_str!r}")
+    return id_str
 
 
 class FilesystemCheckpointBackend(CheckpointBackendProtocol):
@@ -262,6 +263,7 @@ class FilesystemCheckpointBackend(CheckpointBackendProtocol):
         self._path.mkdir(parents=True, exist_ok=True)
 
     def _get_file_path(self, checkpoint_id: str) -> Path:
+        _sanitize_checkpoint_id(checkpoint_id)
         return self._path / f"{checkpoint_id}.json"
 
     def save(self, state: CheckpointState) -> None:
@@ -317,6 +319,7 @@ class Checkpointer:
 
     def _get_next_id(self, agent_name: str) -> str:
         """Get next checkpoint ID for an agent."""
+        _sanitize_checkpoint_id(agent_name)
         if agent_name not in self._counters:
             self._counters[agent_name] = 0
         self._counters[agent_name] += 1

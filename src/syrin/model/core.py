@@ -685,6 +685,8 @@ class Model:
             stop=stop,
         )
 
+        # Strip _internal — must not be forwarded to provider APIs
+        provider_kwargs = {k: v for k, v in provider_kwargs.items() if k != "_internal"}
         self._provider_kwargs = provider_kwargs
         self._variables = self._extract_variables()
 
@@ -964,6 +966,7 @@ class Model:
         """Return a copy with a request/response middleware. For custom transforms."""
         return Model(
             model_id=self._model_id,
+            provider=self._provider,
             name=self._name,
             description=self._description,
             version=self._version,

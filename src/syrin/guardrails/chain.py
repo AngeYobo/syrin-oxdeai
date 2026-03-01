@@ -159,10 +159,13 @@ class GuardrailChain:
 
         first_failure = next((d for d in result.decisions if not d.passed), None)
         if first_failure:
+            idx = result.decisions.index(first_failure)
+            guardrail_name = self._guardrails[idx].name if idx < len(self._guardrails) else None
             return GuardrailCheckResult(
                 passed=False,
                 reason=first_failure.reason,
                 metadata=first_failure.metadata,
+                guardrail_name=guardrail_name,
             )
         return GuardrailCheckResult(passed=True)
 

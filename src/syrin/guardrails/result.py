@@ -24,6 +24,8 @@ class GuardrailCheckResult:
     """Human-readable reason if failed."""
     metadata: dict[str, Any] = field(default_factory=dict)
     """Arbitrary metadata about the check."""
+    guardrail_name: str | None = None
+    """Name of the guardrail that produced this result."""
 
 
 __all__ = ["GuardrailCheckResult"]
