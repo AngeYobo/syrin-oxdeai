@@ -1,5 +1,6 @@
 """Context configuration and stats."""
 
+import dataclasses
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -211,6 +212,37 @@ class Context:
         compactor = self.compactor if self.compactor is not None else ContextCompactor()
         result = compactor.compact(msgs, available)
         return result.messages
+
+    def get_remote_config_schema(self, section_key: str) -> tuple[Any, dict[str, object]]:
+        """RemoteConfigurable: return (schema, current_values) for the context section."""
+        from syrin.remote._schema import build_section_schema_from_obj
+        from syrin.remote._types import ConfigSchema
+
+        if section_key != "context":
+            return (ConfigSchema(section="context", class_name="Context", fields=[]), {})
+        return build_section_schema_from_obj(self, "context", "Context")
+
+    def apply_remote_overrides(
+        self,
+        agent: Any,
+        pairs: list[tuple[str, object]],
+        section_schema: Any,
+    ) -> None:
+        """RemoteConfigurable: apply context overrides to agent._context.context."""
+        from syrin.context import DefaultContextManager
+        from syrin.remote._resolver_helpers import build_nested_update
+
+        update = build_nested_update(section_schema, pairs, "context")
+        if not update:
+            return
+        ctx_manager = getattr(agent, "_context", None)
+        if not isinstance(ctx_manager, DefaultContextManager):
+            return
+        current = getattr(ctx_manager, "context", None)
+        if current is None:
+            return
+        new_ctx = dataclasses.replace(current, **update)
+        object.__setattr__(ctx_manager, "context", new_ctx)
 
 
 __all__ = [

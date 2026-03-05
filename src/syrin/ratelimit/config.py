@@ -1,5 +1,6 @@
 """Rate limit configuration and stats."""
 
+import dataclasses
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -136,6 +137,39 @@ class APIRateLimit:
                 triggered.append(threshold)
 
         return triggered
+
+    def get_remote_config_schema(self, section_key: str) -> tuple[Any, dict[str, object]]:
+        """RemoteConfigurable: return (schema, current_values) for the rate_limit section."""
+        from syrin.remote._schema import build_section_schema_from_obj
+        from syrin.remote._types import ConfigSchema
+
+        if section_key != "rate_limit":
+            return (
+                ConfigSchema(section="rate_limit", class_name="APIRateLimit", fields=[]),
+                {},
+            )
+        return build_section_schema_from_obj(self, "rate_limit", "APIRateLimit")
+
+    def apply_remote_overrides(
+        self,
+        agent: Any,
+        pairs: list[tuple[str, object]],
+        section_schema: Any,
+    ) -> None:
+        """RemoteConfigurable: apply rate_limit overrides to agent._rate_limit_manager.config."""
+        from syrin.remote._resolver_helpers import build_nested_update
+
+        update = build_nested_update(section_schema, pairs, "rate_limit")
+        if not update:
+            return
+        manager = getattr(agent, "_rate_limit_manager", None)
+        if manager is None:
+            return
+        current = getattr(manager, "config", None)
+        if current is None:
+            return
+        new_config = dataclasses.replace(current, **update)
+        object.__setattr__(manager, "config", new_config)
 
 
 __all__ = [

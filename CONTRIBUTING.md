@@ -12,7 +12,7 @@ uv sync
 
 ## Code quality
 
-- **Type checking:** `mypy --strict` must pass on `src/syrin/`.
+- **Type checking:** **mypy is the single source of truth.** Run `mypy --strict src/` (or use `pre-commit.sh`). Pylance/Pyright are set to `typeCheckingMode: "off"` (`.vscode/settings.json`, `pyrightconfig.json`) so the IDE does not report type errors—use mypy only.
 - **Linting:** `ruff check` and `ruff format` (see `pyproject.toml`).
 - **Tests:** `pytest` with `pytest-asyncio` for async tests.
 

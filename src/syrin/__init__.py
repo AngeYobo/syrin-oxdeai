@@ -304,6 +304,7 @@ from syrin.response import (
     Response,
     TokenReport,
 )
+from syrin.remote import init
 from syrin.run_context import RunContext
 from syrin.serve import (
     AgentCard,
@@ -409,6 +410,7 @@ __all__ = [
     "run",
     "configure",
     "get_config",
+    "init",
     # =============================================================================
     # Model - Core
     # =============================================================================

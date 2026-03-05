@@ -58,3 +58,7 @@ PYTHONPATH=. python -m examples.memory.basic_memory
 Examples load `.env` via `python-dotenv`. Run: `python examples/hello_agent.py`
 
 **CLI (transport):** `Syrin serve -a examples.hello_agent:agent` (interactive REPL), `Syrin cost`, `Syrin version`, `Syrin run <script.py>`.
+
+## Remote config
+
+- **12_remote_config/** — `syrin.init()`, config routes (GET/PATCH /config, /config/stream) when serving. See `12_remote_config/README.md`.

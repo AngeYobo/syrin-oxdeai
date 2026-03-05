@@ -392,6 +392,65 @@ class Agent(Servable, metaclass=_AgentMeta):
     _agent_name: ClassVar[str | None] = None
     _agent_description: ClassVar[str] = ""
 
+    # Section key -> attr or path for RemoteConfigurable; None = self (agent section)
+    REMOTE_CONFIG_SECTIONS: ClassVar[dict[str, str | tuple[str, ...] | None]] = {
+        "agent": None,
+        "budget": "_budget",
+        "memory": "_persistent_memory",
+        "context": ("_context", "context"),
+        "checkpoint": "_checkpoint_config",
+        "rate_limit": ("_rate_limit_manager", "config"),
+        "circuit_breaker": "_circuit_breaker",
+        "output": "_output",
+        "guardrails": None,
+        "prompt_vars": None,
+        "tools": None,
+        "mcp": None,
+    }
+
+    def get_remote_config_schema(self, section_key: str) -> tuple[Any, dict[str, object]]:
+        """RemoteConfigurable: return (schema, current_values) for agent-owned sections."""
+        from syrin.remote._schema import get_agent_section_schema_and_values
+        from syrin.remote._types import ConfigSchema
+
+        if section_key == "agent":
+            return get_agent_section_schema_and_values(self)
+        if section_key == "guardrails":
+            return _agent_guardrails_schema_and_values(self)
+        if section_key == "prompt_vars":
+            return _agent_prompt_vars_schema_and_values(self)
+        if section_key == "tools":
+            return _agent_tools_schema_and_values(self)
+        if section_key == "mcp":
+            return _agent_mcp_schema_and_values(self)
+        return (ConfigSchema(section=section_key, class_name="Agent", fields=[]), {})
+
+    def apply_remote_overrides(
+        self,
+        agent: Any,
+        pairs: list[tuple[str, object]],
+        section_schema: Any,
+    ) -> None:
+        """RemoteConfigurable: apply overrides for agent-owned sections."""
+        from syrin.remote._resolver_helpers import apply_agent_section_overrides
+
+        section = getattr(section_schema, "section", None)
+        if section == "agent":
+            apply_agent_section_overrides(agent, pairs, section_schema)
+            return
+        if section == "guardrails":
+            _apply_guardrails_overrides(agent, pairs)
+            return
+        if section == "prompt_vars":
+            _apply_prompt_vars_overrides(agent, pairs)
+            return
+        if section == "tools":
+            _apply_tools_overrides(agent, pairs)
+            return
+        if section == "mcp":
+            _apply_mcp_overrides(agent, pairs)
+            return
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         mro = cls.__mro__
@@ -675,6 +734,15 @@ class Agent(Servable, metaclass=_AgentMeta):
         self._call_prompt_vars: dict[str, Any] | None = None
         self._tools = tools_final if tools_final else []
         self._mcp_instances: list[Any] = mcp_instances
+        self._guardrails_disabled: set[str] = set()
+        self._tools_disabled: set[str] = set()
+        self._mcp_disabled: set[int] = set()
+        self._mcp_tool_indices: dict[str, int] = {}
+        for i, x in enumerate(tools_list):
+            if _is_mcp(x) and hasattr(x, "tools") and callable(x.tools):
+                for t in x.tools():
+                    if isinstance(t, ToolSpec):
+                        self._mcp_tool_indices[t.name] = i
         self._max_tool_iterations = max_tool_iterations
         self._budget = budget
         self._budget_store = budget_store
@@ -868,6 +936,11 @@ class Agent(Servable, metaclass=_AgentMeta):
                 )
             else:
                 self._checkpointer = None
+
+        # Remote config: register with cloud when syrin.init() was called
+        from syrin.remote._hooks import on_agent_init as _remote_init
+
+        _remote_init(self)
 
     @property
     def iteration(self) -> int:
@@ -1234,8 +1307,17 @@ class Agent(Servable, metaclass=_AgentMeta):
 
     @property
     def tools(self) -> list[ToolSpec]:
-        """Tool specs attached to this agent (read-only)."""
-        return list(self._tools) if self._tools else []
+        """Tool specs attached to this agent (read-only). Excludes disabled tools and MCP servers."""
+        raw = list(self._tools) if self._tools else []
+        tools_disabled = getattr(self, "_tools_disabled", set()) or set()
+        mcp_disabled = getattr(self, "_mcp_disabled", set()) or set()
+        mcp_indices = getattr(self, "_mcp_tool_indices", {}) or {}
+        return [
+            t
+            for t in raw
+            if t.name not in tools_disabled
+            and (mcp_indices.get(t.name) not in mcp_disabled)
+        ]
 
     @property
     def model_config(self) -> ModelConfig | None:
@@ -1557,9 +1639,13 @@ class Agent(Servable, metaclass=_AgentMeta):
         text: str,
         stage: GuardrailStage,
     ) -> GuardrailResult:
-        """Run guardrails on text with observability."""
-        if len(self._guardrails) == 0:
+        """Run guardrails on text with observability. Excludes remotely disabled guardrails."""
+        disabled = getattr(self, "_guardrails_disabled", set()) or set()
+        guardrail_list = getattr(self._guardrails, "_guardrails", [])
+        effective = [g for g in guardrail_list if g.name not in disabled]
+        if len(effective) == 0:
             return GuardrailResult(passed=True)
+        effective_chain = GuardrailChain(effective)
 
         # Emit start hook
         self._emit_event(
@@ -1567,7 +1653,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             EventContext(
                 text=text[:200],  # Truncate for event
                 stage=stage.value,
-                guardrail_count=len(self._guardrails),
+                guardrail_count=len(effective_chain),
             ),
         )
 
@@ -1578,7 +1664,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                 SemanticAttributes.GUARDRAIL_STAGE: stage.value,
             },
         ) as guardrail_span:
-            result = self._guardrails.check(text, stage, budget=self._budget, agent=self)
+            result = effective_chain.check(text, stage, budget=self._budget, agent=self)
 
             guardrail_span.set_attribute(
                 SemanticAttributes.GUARDRAIL_PASSED,
@@ -1598,12 +1684,12 @@ class Agent(Servable, metaclass=_AgentMeta):
                     EventContext(
                         stage=stage.value,
                         reason=result.reason,
-                        guardrail_names=[g.name for g in self._guardrails],
+                        guardrail_names=[g.name for g in effective],
                     ),
                 )
 
                 # Store in report
-                guardrail_names = [g.name for g in self._guardrails]
+                guardrail_names = [g.name for g in effective]
                 if stage == GuardrailStage.INPUT:
                     self._run_report.guardrail.input_passed = False
                     self._run_report.guardrail.input_reason = result.reason
@@ -1618,7 +1704,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                     self._run_report.guardrail.blocked_stage = stage.value
             else:
                 # Store guardrail names that passed
-                guardrail_names = [g.name for g in self._guardrails]
+                guardrail_names = [g.name for g in effective]
                 if stage == GuardrailStage.INPUT:
                     self._run_report.guardrail.input_passed = True
                     self._run_report.guardrail.input_guardrails = guardrail_names
@@ -2055,7 +2141,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         return build_messages_for_llm(
             user_input,
             system_prompt=resolved,
-            tools=self._tools,
+            tools=self.tools,
             conversation_memory=self._conversation_memory,
             memory_backend=self._memory_backend,
             persistent_memory=self._persistent_memory,
@@ -2148,7 +2234,7 @@ class Agent(Servable, metaclass=_AgentMeta):
     def _execute_tool(self, name: str, arguments: dict[str, Any]) -> str:
         from syrin.run_context import RunContext
 
-        for spec in self._tools:
+        for spec in self.tools:
             if spec.name == name:
                 try:
                     if spec.inject_run_context:
@@ -2567,7 +2653,7 @@ class Agent(Servable, metaclass=_AgentMeta):
     def _stream_response(self, user_input: str) -> Iterator[StreamChunk]:
         """Stream response chunks synchronously. Records cost per chunk and checks budget mid-stream."""
         messages = self._build_messages(user_input)
-        tools = self._tools if self._tools else None
+        tools = self.tools if self.tools else None
         accumulated = ""
         total_cost = 0.0
         total_tokens = TokenUsage()
@@ -2790,7 +2876,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                 if self._budget is not None:
                     self._budget._set_spent(0)
             messages = self._build_messages(user_input)
-            tools = self._tools if self._tools else None
+            tools = self.tools if self.tools else None
             accumulated = ""
             total_cost = 0.0
             total_tokens = TokenUsage()
@@ -2920,6 +3006,197 @@ class Agent(Servable, metaclass=_AgentMeta):
         return build_router(self, cfg)
 
     # serve() inherited from Servable — HTTP, CLI, STDIO protocols
+
+
+def _agent_guardrails_schema_and_values(agent: Any) -> tuple[Any, dict[str, object]]:
+    """Build (ConfigSchema, current_values) for guardrails section (enable/disable by name)."""
+    from syrin.remote._types import ConfigSchema, FieldSchema
+
+    guardrail_list = getattr(agent._guardrails, "_guardrails", [])
+    fields: list[Any] = []
+    current_values: dict[str, object] = {}
+    disabled: set[str] = getattr(agent, "_guardrails_disabled", set()) or set()
+    for g in guardrail_list:
+        name = getattr(g, "name", getattr(g, "__class__", type(g)).__name__)
+        path = f"guardrails.{name}.enabled"
+        fields.append(
+            FieldSchema(
+                name=f"{name}.enabled",
+                path=path,
+                type="bool",
+                default=True,
+                description=None,
+                constraints={},
+                enum_values=None,
+                children=None,
+                remote_excluded=False,
+            )
+        )
+        current_values[path] = name not in disabled
+    return (
+        ConfigSchema(section="guardrails", class_name="Agent", fields=fields),
+        current_values,
+    )
+
+
+def _agent_prompt_vars_schema_and_values(agent: Any) -> tuple[Any, dict[str, object]]:
+    """Build (ConfigSchema, current_values) for prompt_vars section (realtime template vars)."""
+    from syrin.remote._types import ConfigSchema, FieldSchema
+
+    pv = getattr(agent, "_prompt_vars", {}) or {}
+    fields: list[Any] = []
+    current_values: dict[str, object] = {}
+    for key, val in pv.items():
+        path = f"prompt_vars.{key}"
+        fields.append(
+            FieldSchema(
+                name=key,
+                path=path,
+                type="str",
+                default=None,
+                description=None,
+                constraints={},
+                enum_values=None,
+                children=None,
+                remote_excluded=False,
+            )
+        )
+        current_values[path] = val
+    return (
+        ConfigSchema(section="prompt_vars", class_name="Agent", fields=fields),
+        current_values,
+    )
+
+
+def _agent_tools_schema_and_values(agent: Any) -> tuple[Any, dict[str, object]]:
+    """Build (ConfigSchema, current_values) for tools section (enable/disable by name)."""
+    from syrin.remote._types import ConfigSchema, FieldSchema
+
+    tools_list = getattr(agent, "_tools", []) or []
+    disabled: set[str] = getattr(agent, "_tools_disabled", set()) or set()
+    fields: list[Any] = []
+    current_values: dict[str, object] = {}
+    for t in tools_list:
+        name = getattr(t, "name", "")
+        if not name:
+            continue
+        path = f"tools.{name}.enabled"
+        fields.append(
+            FieldSchema(
+                name=f"{name}.enabled",
+                path=path,
+                type="bool",
+                default=True,
+                description=None,
+                constraints={},
+                enum_values=None,
+                children=None,
+                remote_excluded=False,
+            )
+        )
+        current_values[path] = name not in disabled
+    return (
+        ConfigSchema(section="tools", class_name="Agent", fields=fields),
+        current_values,
+    )
+
+
+def _agent_mcp_schema_and_values(agent: Any) -> tuple[Any, dict[str, object]]:
+    """Build (ConfigSchema, current_values) for mcp section (enable/disable by index)."""
+    from syrin.remote._types import ConfigSchema, FieldSchema
+
+    mcp_list = getattr(agent, "_mcp_instances", []) or []
+    disabled: set[int] = getattr(agent, "_mcp_disabled", set()) or set()
+    fields: list[Any] = []
+    current_values: dict[str, object] = {}
+    for i in range(len(mcp_list)):
+        path = f"mcp.{i}.enabled"
+        fields.append(
+            FieldSchema(
+                name=f"{i}.enabled",
+                path=path,
+                type="bool",
+                default=True,
+                description=None,
+                constraints={},
+                enum_values=None,
+                children=None,
+                remote_excluded=False,
+            )
+        )
+        current_values[path] = i not in disabled
+    return (
+        ConfigSchema(section="mcp", class_name="Agent", fields=fields),
+        current_values,
+    )
+
+
+def _apply_guardrails_overrides(agent: Any, pairs: list[tuple[str, object]]) -> None:
+    """Apply guardrails.*.enabled overrides to agent._guardrails_disabled."""
+    disabled: set[str] | None = getattr(agent, "_guardrails_disabled", None)
+    if disabled is None:
+        object.__setattr__(agent, "_guardrails_disabled", set())
+        disabled = agent._guardrails_disabled
+    for path, value in pairs:
+        if not path.startswith("guardrails.") or not path.endswith(".enabled"):
+            continue
+        name = path[:-len(".enabled")].split(".", 1)[1]
+        if name and (value is True or value is False):
+            if value:
+                disabled.discard(name)
+            else:
+                disabled.add(name)
+
+
+def _apply_prompt_vars_overrides(agent: Any, pairs: list[tuple[str, object]]) -> None:
+    """Apply prompt_vars.* overrides to agent._prompt_vars."""
+    pv = getattr(agent, "_prompt_vars", None)
+    if pv is None:
+        object.__setattr__(agent, "_prompt_vars", {})
+        pv = agent._prompt_vars
+    for path, value in pairs:
+        if not path.startswith("prompt_vars."):
+            continue
+        key = path.split(".", 1)[1]
+        if key:
+            pv[key] = value if value is not None else ""
+
+
+def _apply_tools_overrides(agent: Any, pairs: list[tuple[str, object]]) -> None:
+    """Apply tools.*.enabled overrides to agent._tools_disabled."""
+    disabled: set[str] | None = getattr(agent, "_tools_disabled", None)
+    if disabled is None:
+        object.__setattr__(agent, "_tools_disabled", set())
+        disabled = agent._tools_disabled
+    for path, value in pairs:
+        if not path.startswith("tools.") or not path.endswith(".enabled"):
+            continue
+        name = path[:-len(".enabled")].split(".", 1)[1]
+        if name and (value is True or value is False):
+            if value:
+                disabled.discard(name)
+            else:
+                disabled.add(name)
+
+
+def _apply_mcp_overrides(agent: Any, pairs: list[tuple[str, object]]) -> None:
+    """Apply mcp.*.enabled overrides to agent._mcp_disabled."""
+    disabled: set[int] | None = getattr(agent, "_mcp_disabled", None)
+    if disabled is None:
+        object.__setattr__(agent, "_mcp_disabled", set())
+        disabled = agent._mcp_disabled
+    for path, value in pairs:
+        if not path.startswith("mcp.") or not path.endswith(".enabled"):
+            continue
+        try:
+            i = int(path.split(".")[1])
+        except (IndexError, ValueError):
+            continue
+        if value is True or value is False:
+            if value:
+                disabled.discard(i)
+            else:
+                disabled.add(i)
 
 
 # Presets and builder

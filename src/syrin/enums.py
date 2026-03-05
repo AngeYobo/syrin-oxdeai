@@ -300,6 +300,9 @@ class Hook(StrEnum):
     CHECKPOINT_SAVE = "checkpoint.save"
     CHECKPOINT_LOAD = "checkpoint.load"
 
+    REMOTE_CONFIG_UPDATE = "remote.config.update"
+    REMOTE_CONFIG_ERROR = "remote.config.error"
+
     CONTEXT_COMPRESS = "context.compress"
     CONTEXT_COMPACT = "context.compact"
     CONTEXT_THRESHOLD = "context.threshold"

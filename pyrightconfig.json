@@ -2,10 +2,5 @@
   "include": ["src"],
   "exclude": ["**/node_modules", "**/__pycache__"],
   "pythonVersion": "3.11",
-  "typeCheckingMode": "strict",
-  "reportAny": "error",
-  "reportUnknownMemberType": "warning",
-  "reportUnknownVariableType": "warning",
-  "reportUnnecessaryCast": "warning",
-  "reportUnnecessaryIsInstance": "warning"
+  "typeCheckingMode": "off"
 }

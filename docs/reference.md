@@ -408,6 +408,12 @@ for chunk in agent.astream("Your prompt"):
 
 ---
 
+## Remote Config
+
+Configuration overrides from a backend (Syrin Cloud or self-hosted) without code deploys. Call **`syrin.init(api_key=...)`** (or set `SYRIN_API_KEY`) to enable; agents then register and receive overrides. When serving, **GET/PATCH /config** and **GET /config/stream** are available. Types and wire format: [Remote Config](remote-config.md).
+
+---
+
 ## Useful Links
 
 - [OpenAI Models](https://platform.openai.com/docs/models)

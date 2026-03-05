@@ -1,9 +1,11 @@
-"""HTTP serving — FastAPI routes for /chat, /stream, /health, /ready, /budget, /describe, /.well-known/agent-card.json."""
+"""HTTP serving — FastAPI routes for /chat, /stream, /health, /ready, /budget, /describe, /config, /.well-known/agent-card.json."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -319,6 +321,82 @@ def build_router(
             out["internal_agents"] = internal
             out["setup_type"] = "dynamic_pipeline"
         return out
+
+    # Remote config: GET/PATCH /config, GET /config/stream
+    from syrin.remote._registry import get_registry
+    from syrin.remote._resolver import ConfigResolver
+    from syrin.remote._schema import extract_agent_schema
+    from syrin.remote._types import OverridePayload
+
+    _config_stream_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+    _resolver = ConfigResolver()
+
+    @router.get(_route("/config"))
+    async def get_config_route() -> Any:
+        """Return agent config schema and current values (for remote config dashboard)."""
+        reg = get_registry()
+        agent_id = reg.make_agent_id(agent)
+        schema = reg.get_schema(agent_id) or extract_agent_schema(agent)
+        schema = schema.model_copy(update={"agent_id": agent_id})
+        return schema.model_dump(mode="json")
+
+    @router.patch(_route("/config"))
+    async def patch_config_route(body: dict[str, Any] | None = Body(default=None)) -> Any:  # noqa: B008
+        """Apply config overrides. Body: OverridePayload (agent_id, version, overrides)."""
+        if not body:
+            return JSONResponse(status_code=400, content={"error": "Missing body"})
+        try:
+            payload = OverridePayload.model_validate(body)
+        except Exception as e:
+            return JSONResponse(status_code=422, content={"error": str(e)})
+        reg = get_registry()
+        agent_id = reg.make_agent_id(agent)
+        if payload.agent_id != agent_id:
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"agent_id mismatch: expected {agent_id}"},
+            )
+        result = _resolver.apply_overrides(agent, payload)
+        # Notify stream subscribers
+        with suppress(asyncio.QueueFull):
+            _config_stream_queue.put_nowait(
+                {
+                    "agent_id": agent_id,
+                    "version": payload.version,
+                    "overrides": [o.model_dump() for o in payload.overrides],
+                }
+            )
+        return {
+            "accepted": result.accepted,
+            "rejected": result.rejected,
+            "pending_restart": result.pending_restart,
+        }
+
+    @router.get(_route("/config/stream"))
+    async def config_stream_route() -> Any:
+        """SSE stream for config updates (dashboard subscribes; events on PATCH)."""
+
+        async def stream_events() -> Any:
+            # Send initial heartbeat so clients (and tests) get a first chunk immediately
+            yield "event: heartbeat\ndata: {}\n\n"
+            while True:
+                try:
+                    msg = await asyncio.wait_for(_config_stream_queue.get(), timeout=30.0)
+                    if msg is None:
+                        break
+                    yield f"event: override\ndata: {json.dumps(msg)}\n\n"
+                except asyncio.TimeoutError:
+                    yield "event: heartbeat\ndata: {}\n\n"
+
+        return StreamingResponse(
+            stream_events(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     # MCP co-location — when agent has MCP in tools, mount /mcp
     mcp_instances = getattr(agent, "_mcp_instances", []) or []

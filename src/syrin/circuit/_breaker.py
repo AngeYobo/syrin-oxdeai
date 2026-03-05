@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from syrin.enums import CircuitState
 from syrin.model import Model
@@ -165,3 +166,31 @@ class CircuitBreaker:
     def _emit_trip(self) -> None:
         if self._on_trip is not None:
             self._on_trip(self.get_state())
+
+    def get_remote_config_schema(self, section_key: str) -> tuple[Any, dict[str, object]]:
+        """RemoteConfigurable: return (schema, current_values) for the circuit_breaker section."""
+        from syrin.remote._schema import build_section_schema_from_obj
+        from syrin.remote._types import ConfigSchema
+
+        if section_key != "circuit_breaker":
+            return (
+                ConfigSchema(section="circuit_breaker", class_name="CircuitBreaker", fields=[]),
+                {},
+            )
+        return build_section_schema_from_obj(self, "circuit_breaker", "CircuitBreaker")
+
+    def apply_remote_overrides(
+        self,
+        agent: Any,
+        pairs: list[tuple[str, object]],
+        section_schema: Any,
+    ) -> None:
+        """RemoteConfigurable: apply circuit_breaker overrides (self is agent._circuit_breaker)."""
+        from syrin.remote._resolver_helpers import build_nested_update
+
+        update = build_nested_update(section_schema, pairs, "circuit_breaker")
+        if not update:
+            return
+        for key, value in update.items():
+            if hasattr(self, key):
+                setattr(self, key, value)

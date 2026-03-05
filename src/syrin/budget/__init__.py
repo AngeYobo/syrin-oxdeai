@@ -329,6 +329,32 @@ class Budget(BaseModel):
         """Internal method to track spent amount. Called by BudgetTracker."""
         self._spent = amount
 
+    def get_remote_config_schema(self, section_key: str) -> tuple[Any, dict[str, object]]:
+        """RemoteConfigurable: return (schema, current_values) for the budget section."""
+        from syrin.remote._schema import build_section_schema_from_obj
+        from syrin.remote._types import ConfigSchema
+
+        if section_key != "budget":
+            return (ConfigSchema(section="budget", class_name="Budget", fields=[]), {})
+        return build_section_schema_from_obj(self, "budget", "Budget")
+
+    def apply_remote_overrides(
+        self,
+        agent: Any,
+        pairs: list[tuple[str, object]],
+        section_schema: Any,
+    ) -> None:
+        """RemoteConfigurable: apply budget overrides to agent._budget."""
+        from syrin.remote._resolver_helpers import build_nested_update, merge_nested_update
+
+        update = build_nested_update(section_schema, pairs, "budget")
+        if not update:
+            return
+        current = getattr(agent, "_budget", None)
+        if current is None:
+            return
+        object.__setattr__(agent, "_budget", merge_nested_update(current, update, Budget))
+
     def __str__(self) -> str:
         if self.run is not None:
             remaining = self.remaining if self.remaining is not None else self.run

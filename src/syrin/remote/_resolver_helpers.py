@@ -1,0 +1,144 @@
+"""Shared helpers for building/merging nested updates and applying agent-section overrides.
+
+Used by per-class RemoteConfigurable implementations. No imports of Budget/Memory/Agent
+to avoid circular dependencies.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, cast
+
+from pydantic import BaseModel
+
+from syrin.remote._types import ConfigSchema, FieldSchema
+
+
+def _coerce_enum(value: object, field: FieldSchema | None) -> object:
+    """If field has enum_values, coerce string to enum; else return value."""
+    if field is None or field.enum_values is None or not isinstance(value, str):
+        return value
+    if value not in field.enum_values:
+        return value  # Caller will validate
+    path = field.path
+    if path == "agent.loop_strategy":
+        from syrin.enums import LoopStrategy
+
+        return LoopStrategy(value)
+    if path.startswith("memory.decay.") and field.name == "strategy":
+        from syrin.enums import DecayStrategy
+
+        return DecayStrategy(value)
+    if path.startswith("checkpoint.") and field.name == "trigger":
+        from syrin.checkpoint import CheckpointTrigger
+
+        return CheckpointTrigger(value)
+    return value
+
+
+def build_nested_update(
+    section_schema: ConfigSchema,
+    overrides: list[tuple[str, object]],
+    prefix: str,
+    coerce_fn: Callable[[object, FieldSchema | None], object] = _coerce_enum,
+) -> dict[str, Any]:
+    """Build update dict for a section from list of (path, value). Handles nested paths."""
+    update: dict[str, Any] = {}
+    path_to_field = {f.path: f for f in section_schema.fields}
+    for f in section_schema.fields:
+        if f.children:
+            for c in f.children:
+                path_to_field[c.path] = c
+    for path, raw_value in overrides:
+        if not path.startswith(prefix + "."):
+            continue
+        suffix = path[len(prefix) + 1 :]
+        field = path_to_field.get(path)
+        value = coerce_fn(raw_value, field) if field else raw_value
+        parts = suffix.split(".")
+        if len(parts) == 1:
+            update[parts[0]] = value
+        else:
+            key = parts[0]
+            inner = update.setdefault(key, {})
+            if not isinstance(inner, dict):
+                inner = {}
+                update[key] = inner
+            if len(parts) == 2:
+                inner[parts[1]] = value
+            else:
+                cur: dict[str, Any] = inner
+                for i in range(1, len(parts) - 1):
+                    nxt = cur.setdefault(parts[i], {})
+                    if not isinstance(nxt, dict):
+                        nxt = {}
+                        cur[parts[i]] = nxt
+                    cur = nxt
+                cur[parts[-1]] = value
+    return update
+
+
+def merge_nested_update(
+    current: BaseModel | None,
+    update: dict[str, Any],
+    model_class: type[BaseModel],
+) -> BaseModel:
+    """Merge nested update dict into current Pydantic model. Re-validates result."""
+    if current is None:
+        return model_class(**update)
+    for key, val in list(update.items()):
+        if isinstance(val, dict) and not hasattr(val, "model_fields"):
+            child = getattr(current, key, None)
+            if child is not None and hasattr(child, "model_copy"):
+                from pydantic import BaseModel as BM
+
+                if isinstance(child, BM):
+                    child_cls = type(child)
+                    merged = merge_nested_update(child, val, child_cls)
+                    update[key] = merged
+    result = current.model_copy(update=update)
+    return model_class.model_validate(result.model_dump())
+
+
+def apply_agent_section_overrides(
+    agent: Any,
+    pairs: list[tuple[str, object]],
+    _section_schema: ConfigSchema,
+) -> None:
+    """Apply agent-section (agent.*) overrides to the agent."""
+    from syrin.enums import LoopStrategy
+    from syrin.loop import LoopStrategyMapping
+
+    for path, value in pairs:
+        if not path.startswith("agent."):
+            continue
+        key = path.split(".", 1)[1]
+        if key == "max_tool_iterations":
+            object.__setattr__(
+                agent,
+                "_max_tool_iterations",
+                int(cast(int | float | str, value)) if value is not None else 10,
+            )
+        elif key == "debug":
+            object.__setattr__(agent, "_debug", bool(value))
+        elif key == "system_prompt":
+            object.__setattr__(
+                agent, "_system_prompt_source", str(value) if value is not None else ""
+            )
+        elif key == "hitl_timeout":
+            object.__setattr__(
+                agent,
+                "_hitl_timeout",
+                int(cast(int | float | str, value)) if value is not None else 300,
+            )
+        elif key == "loop_strategy":
+            strategy: LoopStrategy | str
+            if isinstance(value, LoopStrategy):
+                strategy = value
+            elif isinstance(value, str):
+                strategy = LoopStrategy(value)
+            else:
+                continue
+            max_iter = getattr(agent, "_max_tool_iterations", 10)
+            new_loop = LoopStrategyMapping.create_loop(strategy, max_iterations=max_iter)
+            object.__setattr__(agent, "_loop", new_loop)

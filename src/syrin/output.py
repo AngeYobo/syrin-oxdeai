@@ -73,3 +73,28 @@ class Output:
         self.context = context or {}
         self.validator = validator
         self.strict = strict
+
+    def get_remote_config_schema(self, section_key: str) -> tuple[Any, dict[str, object]]:
+        """RemoteConfigurable: return (schema, current_values) for the output section."""
+        from syrin.remote._schema import build_section_schema_from_obj
+        from syrin.remote._types import ConfigSchema
+
+        if section_key != "output":
+            return (ConfigSchema(section="output", class_name="Output", fields=[]), {})
+        return build_section_schema_from_obj(self, "output", "Output")
+
+    def apply_remote_overrides(
+        self,
+        agent: Any,
+        pairs: list[tuple[str, object]],
+        section_schema: Any,
+    ) -> None:
+        """RemoteConfigurable: apply output overrides (self is agent._output)."""
+        from syrin.remote._resolver_helpers import build_nested_update
+
+        update = build_nested_update(section_schema, pairs, "output")
+        if not update:
+            return
+        for key, value in update.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
