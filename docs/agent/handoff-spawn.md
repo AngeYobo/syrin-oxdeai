@@ -60,11 +60,23 @@ response = researcher.handoff(
 
 | Hook | When | Context fields |
 |------|------|----------------|
-| **HANDOFF_START** | Before transfer | `source_agent`, `target_agent`, `task`, `mem_count`, `transfer_context`, `transfer_budget` |
+| **HANDOFF_START** | Before transfer | `source_agent`, `target_agent`, `task`, `mem_count`, `transfer_context`, `transfer_budget`, `handoff_context` |
 | **HANDOFF_END** | After target completes | `source_agent`, `target_agent`, `task`, `cost`, `duration`, `response_preview` |
-| **HANDOFF_BLOCKED** | When blocked by before-handler | `source_agent`, `target_agent`, `task`, `reason` |
+| **HANDOFF_BLOCKED** | When blocked by before-handler | `source_agent`, `target_agent`, `task`, `reason`, `handoff_context` |
 
-Use `response_preview` (first ~200 chars of target’s response) to debug handoff output without inspecting the full response.
+- **handoff_context:** A `ContextSnapshot` of the source agent's context at handoff time. Use it to see token counts, breakdown, `context_rot_risk`, and provenance. If the source never ran `response()` yet, the snapshot has `total_tokens=0`. For JSON export use `ctx["handoff_context"].to_dict()`.
+- **response_preview:** First ~200 chars of target's response; use to debug handoff output without inspecting the full response.
+
+### Context visibility at handoff
+
+Handlers for **HANDOFF_START** and **HANDOFF_BLOCKED** receive `handoff_context`, a point-in-time view of the source agent's context (messages, tokens, rot risk). Use it for logging, audit, or to decide whether to block handoff when context is too large or in a rot-risk state.
+
+**When is handoff_context populated?**
+
+- **Empty snapshot:** If the source agent has never run `response()` before the handoff, no context has been prepared for it. In that case `handoff_context` is still a `ContextSnapshot`, but with `total_tokens=0`, `utilization_pct=0`, and breakdown (system, tools, memory, messages) all zero. This is expected when the first thing the source does is hand off.
+- **Populated snapshot:** After the source has run `response()` at least once, the context manager has a last-prepared state. At the next handoff, `handoff_context` reflects that state: non-zero `total_tokens`, breakdown (e.g. `system_tokens`, `messages_tokens`), and `context_rot_risk` from utilization. Use this to see exactly what was in the source's context window when it handed off.
+
+**transfer_context and memory:** `transfer_context=True` (default) copies the source's **persistent memories** (from `Memory`) to the target. If the source has no memory backend (`memory=None`), nothing is transferred and a warning is logged. To avoid the warning when you are not using memory, pass `transfer_context=False` (e.g. when the demo only needs context visibility in the snapshot, not memory transfer).
 
 ### Blocking handoff
 
@@ -118,7 +130,9 @@ except HandoffRetryRequested as e:
 
 - [Events & Hooks](events-hooks.md) — Hook registration and context
 - [Agent API Reference](api-reference.md) — Method signatures and exceptions
+- [Context](../context.md) — Snapshot, breakdown, and handoff/spawn context visibility
 - `examples/07_multi_agent/handoff_intercept.py` — Observability, blocking, retry
+- `examples/07_multi_agent/handoff_spawn_context_visibility.py` — handoff_context and spawn metadata in hooks
 
 ---
 
@@ -153,9 +167,11 @@ child_response = parent.spawn(
 | `agent_class` | `type[Agent]` | — | Sub-agent class |
 | `task` | `str \| None` | `None` | Task to run immediately |
 | `budget` | `Budget \| None` | `None` | Pocket money or shared |
-| `max_children` | `int \| None` | `None` | Max concurrent children |
+| `max_children` | `int \| None` | `None` | Max concurrent children for this call; overrides instance default |
 
 **Returns:** `Agent` if `task` is `None`, else `Response[str]`
+
+You can set the default cap at construction: `Agent(..., max_children=5)`. The spawn limit is then 5 unless you pass `max_children=N` to `spawn()` for that call.
 
 ### Budget inheritance
 
@@ -166,7 +182,7 @@ child_response = parent.spawn(
 ### Validation
 
 - Child budget cannot exceed parent’s remaining when parent has budget.
-- `max_children` limit is enforced; exceeding it raises `RuntimeError`.
+- **max_children** limit is enforced: if you spawn more than the cap (without completing tasks that decrement the count), the next spawn raises `RuntimeError`. Set the cap via `Agent(..., max_children=N)` or per call with `spawn(..., max_children=N)`. Default cap is 10.
 
 ```python
 parent = ParentAgent(budget=Budget(run=1.0, shared=True))
@@ -177,8 +193,17 @@ response = parent.spawn(ChildAgent, task="...")  # Child uses parent budget
 
 | Hook | When | Context fields |
 |------|------|----------------|
-| **SPAWN_START** | Before child creation | `source_agent`, `child_agent`, `child_task`, `child_budget` |
+| **SPAWN_START** | Before child creation | `source_agent`, `child_agent`, `child_task`, `child_budget`, `context_inherited`, `initial_context_tokens`, `parent_context_tokens` |
 | **SPAWN_END** | After child completes (only when `task` given) | `source_agent`, `child_agent`, `child_task`, `cost`, `duration` |
+
+- **context_inherited:** Whether the child received parent context (currently always `False`; reserved for future context-inheritance features).
+- **initial_context_tokens:** Child's context token count at spawn time; `0` because the child has not run `response()` yet.
+- **parent_context_tokens:** Parent's context token count at spawn time (from the parent's last context snapshot). Use for visibility into how large the parent's context was when it spawned.
+
+**When is spawn context metadata populated?**
+
+- **parent_context_tokens = 0:** If the parent has never run `response()` before the spawn, it has no last-prepared context, so `parent_context_tokens` is 0. After the parent has run `response()` at least once, the next spawn reports the parent's last snapshot size (e.g. 28 or 29 tokens from that prepare).
+- **Child does not receive parent conversation:** With `context_inherited=False` (current behaviour), the child only receives the **task string** you pass to `spawn(..., task="...")`. The child does not see the parent's message history or prior turns. So if the parent asked "What is 2+2?" and then spawns with `task="Repeat that number"`, the child has no access to "4" — it only sees the literal task. Give the child a self-contained task (e.g. "Reply with the number 4") when the child must produce an answer without parent context.
 
 ---
 

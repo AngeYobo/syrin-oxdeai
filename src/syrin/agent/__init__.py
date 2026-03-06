@@ -552,6 +552,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         description: str | None = _UNSET,
         prompt_vars: dict[str, Any] | None = None,
         inject_builtins: bool = True,
+        max_children: int | None = None,
     ) -> None:
         """Create an agent with model, prompt, tools, and optional config.
 
@@ -602,6 +603,9 @@ class Agent(Servable, metaclass=_AgentMeta):
             hitl_timeout: Seconds to wait for approval. On timeout, reject. Default 300.
             deps: Dependencies for tools. Tools with ctx: RunContext[Deps] receive this
                 via ctx.deps. Enables testing (mock deps) and multi-tenant (user deps).
+            max_children: Cap on concurrent child agents when using spawn(). When set,
+                spawn() raises RuntimeError if limit reached. Default: 10 (from class
+                _max_children if not set). Use spawn(..., max_children=N) to override per call.
 
         Example:
             >>> agent = Agent(
@@ -850,6 +854,8 @@ class Agent(Servable, metaclass=_AgentMeta):
         self._last_iteration: int = 0
         self._thread_id: str | None = None  # Set by run context; used in prompt vars
         self._child_count: int = 0
+        if max_children is not None:
+            self._max_children = max_children
 
         # Guardrails setup
         if guardrails is None or (isinstance(guardrails, list) and len(guardrails) == 0):
@@ -1782,6 +1788,10 @@ class Agent(Servable, metaclass=_AgentMeta):
         src_name = type(self).__name__
         tgt_name = target_agent.__name__
 
+        handoff_context = (
+            self._context.snapshot() if hasattr(self._context, "snapshot") else ContextSnapshot()
+        )
+
         start_ctx = EventContext(
             {
                 "source_agent": src_name,
@@ -1790,6 +1800,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                 "mem_count": mem_count,
                 "transfer_context": transfer_context,
                 "transfer_budget": transfer_budget,
+                "handoff_context": handoff_context,
             }
         )
 
@@ -1802,6 +1813,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                     "target_agent": tgt_name,
                     "task": task,
                     "reason": str(e),
+                    "handoff_context": handoff_context,
                 }
             )
             self._emit_event(Hook.HANDOFF_BLOCKED, blocked_ctx)
@@ -1907,12 +1919,20 @@ class Agent(Servable, metaclass=_AgentMeta):
         child_task = task or ""
         child_budget = budget
 
+        parent_snapshot = (
+            self._context.snapshot() if hasattr(self._context, "snapshot") else ContextSnapshot()
+        )
+        parent_context_tokens = parent_snapshot.total_tokens
+
         start_ctx = EventContext(
             {
                 "source_agent": type(self).__name__,
                 "child_agent": child_name,
                 "child_task": child_task,
                 "child_budget": child_budget,
+                "context_inherited": False,
+                "initial_context_tokens": 0,
+                "parent_context_tokens": parent_context_tokens,
             }
         )
         self._emit_event(Hook.SPAWN_START, start_ctx)

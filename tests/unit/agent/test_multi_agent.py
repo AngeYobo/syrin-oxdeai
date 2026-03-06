@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syrin import Agent, HandoffBlockedError, HandoffRetryRequested, Model, Response
+from syrin.context.snapshot import ContextSnapshot
 from syrin.enums import Hook, MemoryType
 from syrin.events import EventContext
 from syrin.exceptions import ValidationError
@@ -423,6 +424,102 @@ class TestHandoffHooks:
         assert len(start_ctx) == 1
         assert start_ctx[0]["mem_count"] == 2
 
+    @patch("syrin.agent._resolve_provider")
+    def test_handoff_start_includes_handoff_context(self, mock_get_provider):
+        """HANDOFF_START context includes handoff_context (ContextSnapshot)."""
+        mock_get_provider.return_value = create_mock_provider()
+
+        start_ctx: list[EventContext] = []
+
+        class SourceAgent(Agent):
+            model = Model("test/model")
+
+        class TargetAgent(Agent):
+            model = Model("test/model")
+
+        source = SourceAgent()
+        source.events.on(Hook.HANDOFF_START, lambda ctx: start_ctx.append(ctx))
+
+        source.handoff(TargetAgent, "Do task")
+
+        assert len(start_ctx) == 1
+        assert "handoff_context" in start_ctx[0]
+        handoff_context = start_ctx[0]["handoff_context"]
+        assert isinstance(handoff_context, ContextSnapshot)
+        assert handoff_context.total_tokens >= 0
+        assert handoff_context.context_rot_risk in ("low", "medium", "high")
+
+    @patch("syrin.agent._resolve_provider")
+    def test_handoff_start_handoff_context_empty_when_no_prepare(self, mock_get_provider):
+        """When source never ran response(), handoff_context has zero total_tokens."""
+        mock_get_provider.return_value = create_mock_provider()
+
+        start_ctx: list[EventContext] = []
+
+        class SourceAgent(Agent):
+            model = Model("test/model")
+
+        class TargetAgent(Agent):
+            model = Model("test/model")
+
+        source = SourceAgent()
+        source.events.on(Hook.HANDOFF_START, lambda ctx: start_ctx.append(ctx))
+
+        source.handoff(TargetAgent, "Do task")
+
+        assert len(start_ctx) == 1
+        snap = start_ctx[0]["handoff_context"]
+        assert isinstance(snap, ContextSnapshot)
+        assert snap.total_tokens == 0
+
+    @patch("syrin.agent._resolve_provider")
+    def test_handoff_blocked_includes_handoff_context(self, mock_get_provider):
+        """HANDOFF_BLOCKED context includes handoff_context (same snapshot as START)."""
+        mock_get_provider.return_value = create_mock_provider()
+
+        blocked_ctx: list[EventContext] = []
+
+        class SourceAgent(Agent):
+            model = Model("test/model")
+
+        class TargetAgent(Agent):
+            model = Model("test/model")
+
+        def block(_ctx: EventContext) -> None:
+            raise HandoffBlockedError("blocked", "SourceAgent", "TargetAgent", "task")
+
+        source = SourceAgent()
+        source.events.before(Hook.HANDOFF_START, block)
+        source.events.on(Hook.HANDOFF_BLOCKED, lambda ctx: blocked_ctx.append(ctx))
+
+        with pytest.raises(HandoffBlockedError):
+            source.handoff(TargetAgent, "task")
+
+        assert len(blocked_ctx) == 1
+        assert "handoff_context" in blocked_ctx[0]
+        assert isinstance(blocked_ctx[0]["handoff_context"], ContextSnapshot)
+
+    @patch("syrin.agent._resolve_provider")
+    def test_handoff_end_does_not_include_handoff_context(self, mock_get_provider):
+        """HANDOFF_END context does not include handoff_context (only START/BLOCKED)."""
+        mock_get_provider.return_value = create_mock_provider()
+
+        end_ctx: list[EventContext] = []
+
+        class SourceAgent(Agent):
+            model = Model("test/model")
+
+        class TargetAgent(Agent):
+            model = Model("test/model")
+
+        source = SourceAgent()
+        source.events.on(Hook.HANDOFF_END, lambda ctx: end_ctx.append(ctx))
+
+        source.handoff(TargetAgent, "Do task")
+
+        assert len(end_ctx) == 1
+        assert "handoff_context" not in end_ctx[0]
+
 
 class TestSpawnHooks:
     """TDD tests for spawn hooks."""
@@ -459,6 +556,33 @@ class TestSpawnHooks:
         assert "cost" in end_ctx[0]
         assert "duration" in end_ctx[0]
         assert isinstance(result, Response)
+
+    @patch("syrin.agent._resolve_provider")
+    def test_spawn_start_includes_context_metadata(self, mock_get_provider):
+        """SPAWN_START context includes context_inherited, initial_context_tokens, parent_context_tokens."""
+        mock_get_provider.return_value = create_mock_provider()
+
+        start_ctx: list[EventContext] = []
+
+        class ParentAgent(Agent):
+            model = Model("test/model")
+
+        class ChildAgent(Agent):
+            model = Model("test/model")
+
+        parent = ParentAgent()
+        parent.events.on(Hook.SPAWN_START, lambda ctx: start_ctx.append(ctx))
+
+        parent.spawn(ChildAgent, task="Do task")
+
+        assert len(start_ctx) == 1
+        assert "context_inherited" in start_ctx[0]
+        assert start_ctx[0]["context_inherited"] is False
+        assert "initial_context_tokens" in start_ctx[0]
+        assert start_ctx[0]["initial_context_tokens"] == 0
+        assert "parent_context_tokens" in start_ctx[0]
+        assert isinstance(start_ctx[0]["parent_context_tokens"], int)
+        assert start_ctx[0]["parent_context_tokens"] >= 0
 
     @patch("syrin.agent._resolve_provider")
     def test_spawn_without_task_emits_start_only(self, mock_get_provider):
@@ -518,6 +642,21 @@ class TestSpawnHooks:
         assert start_count == 2
         assert end_count == 2
         assert len(results) == 2
+
+    @patch("syrin.agent._resolve_provider")
+    def test_agent_max_children_constructor(self, mock_get_provider):
+        """Agent(max_children=N) enforces limit; (N+1)-th spawn raises RuntimeError."""
+        mock_get_provider.return_value = create_mock_provider()
+
+        class ChildAgent(Agent):
+            model = Model("test/model")
+
+        parent = Agent(model=Model("test/model"), max_children=2)
+        # Spawn without task so children stay "in flight" (_child_count not decremented)
+        parent.spawn(ChildAgent)
+        parent.spawn(ChildAgent)
+        with pytest.raises(RuntimeError, match="max children.*2.*reached"):
+            parent.spawn(ChildAgent)
 
 
 class TestPipeline:

@@ -460,6 +460,8 @@ data = snap.to_dict()
 
 **Hook:** **context.snapshot** is emitted after each **prepare** with payload **snapshot** (the **to_dict()** result) and **utilization_pct**.
 
+**Handoff and spawn:** The same context snapshot is exposed in **HANDOFF_START** and **HANDOFF_BLOCKED** as **handoff_context**, and **SPAWN_START** includes **parent_context_tokens** (parent's snapshot token count). See [Handoff & Spawn](agent/handoff-spawn.md) for hook payloads and context visibility.
+
 ---
 
 ## Events
