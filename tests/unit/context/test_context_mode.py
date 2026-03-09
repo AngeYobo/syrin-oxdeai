@@ -247,7 +247,7 @@ class TestContextModeFocused:
 
 
 class TestContextModeIntelligent:
-    """context_mode=intelligent: raises NotImplementedError (Step 10)."""
+    """context_mode=intelligent: raises NotImplementedError."""
 
     def test_intelligent_raises_not_implemented(self) -> None:
         manager = DefaultContextManager(

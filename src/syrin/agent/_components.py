@@ -1,4 +1,4 @@
-"""Internal agent components — Phase 3.1 split.
+"""Internal agent components.
 
 Agent composes behavior from focused concerns (budget, context, memory, etc.).
 Component classes hold state; Agent delegates via properties. Public API remains Agent.

@@ -174,7 +174,8 @@ class DefaultAgentRunContext:
 
     @property
     def model_id(self) -> str:
-        return cast(str, self._agent._model_config.model_id)
+        effective = getattr(self._agent, "_active_model_config", None) or self._agent._model_config
+        return cast(str, effective.model_id)
 
     @property
     def tools(self) -> list[ToolSpec] | None:
@@ -182,9 +183,10 @@ class DefaultAgentRunContext:
 
     @property
     def max_output_tokens(self) -> int:
-        if getattr(self._agent, "_model", None) is None:
+        active = getattr(self._agent, "_active_model", None) or getattr(self._agent, "_model", None)
+        if active is None:
             return 1024
-        meta = getattr(self._agent._model, "metadata", None) or {}
+        meta = getattr(active, "metadata", None) or {}
         return cast(int, meta.get("max_output_tokens", 1024))
 
     @property
@@ -197,11 +199,13 @@ class DefaultAgentRunContext:
 
     @property
     def pricing_override(self) -> Any:
-        return (
-            getattr(self._agent._model, "pricing", None)
-            if getattr(self._agent, "_model", None) is not None
-            else None
-        )
+        from syrin.cost import ModelPricing
+
+        active = getattr(self._agent, "_active_model", None) or getattr(self._agent, "_model", None)
+        if active is None:
+            return None
+        p = getattr(active, "pricing", None)
+        return p if isinstance(p, ModelPricing) else None
 
     @property
     def approval_gate(self) -> Any:

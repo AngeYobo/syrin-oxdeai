@@ -6,7 +6,7 @@ Complete reference for every `Agent` constructor parameter.
 
 ```python
 Agent(
-    model=None,                    # Required (or set on class)
+    model=None,                    # Required (or set on class); Model or list[Model] for routing
     system_prompt=None,
     tools=None,
     budget=None,
@@ -21,6 +21,7 @@ Agent(
     guardrails=None,
     context=None,
     rate_limit=None,
+    router_config=None,            # When model is list; RouterConfig for routing
     checkpoint=None,
     debug=False,
     tracer=None,
@@ -35,9 +36,9 @@ Parameters marked `None` use class-level defaults when available. Use `_UNSET` i
 
 ### `model` — **Required**
 
-LLM used by the agent.
+LLM(s) used by the agent. Single model or list for routing.
 
-**Type:** `Model | ModelConfig | None`  
+**Type:** `Model | ModelConfig | list[Model | ModelConfig] | None`  
 **Default:** From class `model` if not provided
 
 ```python
@@ -45,12 +46,18 @@ from syrin.model import Model
 
 agent = Agent(
     # model=Model.OpenAI("gpt-4o-mini"),
-    model=Model.Almock(),  # No API Key needed
+    model=Model.Almock(),  # No API key needed
 )
 # Or: Model.Anthropic("claude-sonnet-4-5"), Model.Ollama("llama3"), etc.
+
+# Multiple models + router_config for per-request routing
+agent = Agent(
+    model=[Model.Anthropic(...), Model.OpenAI(...)],
+    router_config=RouterConfig(routing_mode=RoutingMode.AUTO),
+)
 ```
 
-Must be provided on the class or at construction. Raises `TypeError` if missing.
+Must be provided on the class or at construction. Raises `TypeError` if missing. When `model` is a list, use `router_config` to enable routing. See [Routing](../routing.md).
 
 ---
 
@@ -329,6 +336,29 @@ agent = Agent(
 ```
 
 See [Rate Limiting](rate-limiting.md).
+
+---
+
+### `router_config`
+
+Routing configuration when `model` is a list. Enables per-request model selection by task, cost, and modality.
+
+**Type:** `RouterConfig | None`  
+**Default:** `None`
+
+```python
+from syrin.router import RouterConfig, RoutingMode
+
+agent = Agent(
+    model=[claude, gpt],
+    router_config=RouterConfig(
+        routing_mode=RoutingMode.AUTO,
+        budget_optimisation=True,
+    ),
+)
+```
+
+Options: `routing_mode`, `force_model`, `classifier`, `routing_rule_callback`, budget thresholds. See [Routing](../routing.md) and [Agent: Model](model.md#model-list--routing).
 
 ---
 

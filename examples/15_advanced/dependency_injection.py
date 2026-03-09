@@ -1,4 +1,4 @@
-"""Dependency Injection Example (v0.3.0+).
+"""Dependency Injection Example.
 
 Demonstrates:
 - Agent(config=AgentConfig(dependencies=...)) for runtime dependencies

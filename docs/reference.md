@@ -52,6 +52,8 @@ Model.Anthropic("claude-sonnet", api_key=os.getenv("ANTHROPIC_API_KEY"))
 Model.Custom("deepseek-chat", api_base="https://api.deepseek.com/v1", api_key="...")
 ```
 
+**Routing:** Pass `model=[M1, M2, M3]` + `router_config=RouterConfig(routing_mode=...)` for per-request model selection. See [Routing](routing.md).
+
 ---
 
 ## Tools

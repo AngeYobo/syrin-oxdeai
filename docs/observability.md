@@ -86,7 +86,50 @@ Every span has a **kind** that identifies what type of operation it represents:
 | `SpanKind.GUARDRAIL` | Guardrail validation |
 | `SpanKind.HANDOFF` | Agent handoff to another agent |
 | `SpanKind.WORKFLOW` | Custom workflow (user-defined) |
-| `SpanKind.INTERNAL` | Internal framework operation |
+| `SpanKind.INTERNAL` | Internal framework operation (including `routing.decision`) |
+
+### Fallback and Provider Error Traces
+
+When a primary model fails and fallback is used, or when provider errors occur, `debug=True` records span events:
+
+**Model fallback** (`Model.with_fallback()`): Events `llm.provider_error` and `llm.fallback` record the failed model, the model tried next, and the error.
+
+**Circuit breaker fallback**: When the circuit breaker is open and a fallback model is used, `Hook.LLM_FALLBACK` is emitted with `from_model`, `to_model`, and `reason=circuit_breaker_open`.
+
+**Provider errors**: Any provider failure (API error, rate limit, auth failure) is recorded on the span as `llm.provider_error` with `llm.provider_error.model`, `error.type`, and `error.message`.
+
+Example trace with fallback:
+
+```
+llm: llm.iteration_1
+  attributes:
+    llm.model=anthropic/claude-sonnet
+  events:
+    - llm.provider_error: llm.provider_error.model=anthropic/claude-sonnet, error.type=ProviderError, error.message=...
+    - llm.fallback: llm.fallback.from_model=anthropic/claude-sonnet, llm.fallback.to_model=openai/gpt-4o-mini, error.type=..., error.message=...
+```
+
+Use `Hook.LLM_FALLBACK` and `Hook.LLM_RETRY` for custom logging. See [Events & Hooks](agent/events-hooks.md).
+
+### Routing Traces
+
+When using Agent with a model list and routing, `debug=True` (or `--trace`) emits a `routing.decision` span showing which model was chosen and why:
+
+```
+internal: routing.decision
+  trace_id=... span_id=...
+  duration=...ms status=ok
+  attributes:
+    routing.model=code-model
+    routing.model_id=almock/...
+    routing.reason=COST_FIRST: selected cheapest capable model
+    routing.task_type=CODE
+    routing.cost_estimate=$0.000021
+    routing.confidence=0.85
+    routing.alternatives=general-model
+```
+
+Use `Hook.ROUTING_DECISION` for custom logging. See [Events & Hooks](agent/events-hooks.md) and [Routing](routing.md).
 
 ### Sessions
 

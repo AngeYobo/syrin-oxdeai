@@ -1,4 +1,4 @@
-"""Tests for persistent context map (Step 12).
+"""Tests for persistent context map.
 
 ContextMap, FileContextMapBackend, get_map/update_map, inject_map_summary.
 """

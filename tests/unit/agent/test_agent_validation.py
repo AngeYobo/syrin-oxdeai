@@ -21,13 +21,13 @@ def _almock() -> Model:
 
 def test_agent_model_str_rejects_with_clear_error() -> None:
     """model=str must raise TypeError with friendly message."""
-    with pytest.raises(TypeError, match=r"model must be Model or ModelConfig"):
+    with pytest.raises(TypeError, match=r"model must be Model"):
         Agent(model="gpt-4o-mini")
 
 
 def test_agent_model_int_rejects_with_clear_error() -> None:
     """model=int must raise TypeError with friendly message."""
-    with pytest.raises(TypeError, match=r"model must be Model or ModelConfig"):
+    with pytest.raises(TypeError, match=r"model must be Model"):
         Agent(model=42)
 
 

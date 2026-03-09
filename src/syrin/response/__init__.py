@@ -383,6 +383,10 @@ class Response(Generic[T]):
         context_stats: Context usage stats for this call.
         context: Context used (when overridden per-call).
         raw_response: Provider-specific raw response (parsed Pydantic for structured output).
+        routing_reason: RoutingReason when model routing was used. None if single model.
+        model_used: Actual model ID from provider (e.g. OpenRouter header). Same as model if not set.
+        task_type: TaskType used for routing when applicable.
+        actual_cost: Actual cost from provider (e.g. OpenRouter). Same as cost if not set.
 
     For structured output (output=Output(MyModel)):
         result.data — Parsed dict
@@ -413,6 +417,10 @@ class Response(Generic[T]):
     context_stats: ContextStats | None = None  # per-call context stats
     context: Context | None = None  # Context used for this call (overrides agent's when passed)
     raw_response: Any = None  # Provider raw response; parsed Pydantic for structured output
+    routing_reason: Any = None  # RoutingReason when routing was used
+    model_used: str | None = None  # Actual model from provider (e.g. OpenRouter header)
+    task_type: Any = None  # TaskType used for routing
+    actual_cost: float | None = None  # Actual cost from provider header
 
     @property
     def data(self) -> dict[str, Any] | None:

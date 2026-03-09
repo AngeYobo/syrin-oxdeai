@@ -98,6 +98,8 @@ agent.events.on_all(log_all)
 - `LLM_RETRY` — Retrying a failed call
 - `LLM_FALLBACK` — Falling back to another model
 
+**LLM_FALLBACK context fields:** `reason` (e.g. `circuit_breaker_open`), `from_model`, `to_model`. Emitted when the Agent uses a fallback model (e.g. circuit breaker open) or when `Model.with_fallback()` is used. Span events `llm.provider_error` and `llm.fallback` are also recorded on the LLM span for full trace visibility.
+
 ### Tools
 
 - `TOOL_CALL_START` — Before tool execution
@@ -109,6 +111,29 @@ agent.events.on_all(log_all)
 - `BUDGET_CHECK` — Budget checked
 - `BUDGET_THRESHOLD` — Threshold crossed
 - `BUDGET_EXCEEDED` — Limit exceeded
+
+### Routing (Agent with model list)
+
+- `ROUTING_DECISION` — Model selected. Use `debug=True` or `--trace` to see routing in traces.
+
+**Context fields:**
+
+| Field | Description |
+|-------|-------------|
+| `routing_reason` | `RoutingReason` — `selected_model`, `reason`, `task_type`, `cost_estimate`, `alternatives`, `classification_confidence`, `complexity_tier`, `system_alignment_score` |
+| `model` | Model ID chosen (e.g. `anthropic/claude-sonnet-4-5`) |
+| `task_type` | Detected or overridden task type |
+| `prompt` | User prompt (truncated to 200 chars) |
+
+**Trace span:** When `debug=True`, a `routing.decision` span is emitted with attributes: `routing.model`, `routing.model_id`, `routing.reason`, `routing.task_type`, `routing.cost_estimate`, `routing.confidence`, `routing.alternatives`.
+
+**Example:** Log which model was chosen and why:
+
+```python
+agent.events.on(Hook.ROUTING_DECISION, lambda ctx: print(
+    f"Chosen: {ctx.routing_reason.selected_model} | {ctx.routing_reason.reason}"
+))
+```
 
 ### Other
 

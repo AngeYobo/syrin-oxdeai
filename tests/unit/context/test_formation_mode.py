@@ -1,4 +1,4 @@
-"""Tests for formation_mode PUSH vs PULL (Step 10).
+"""Tests for formation_mode PUSH vs PULL.
 
 PULL uses agent's Memory for segment storage and retrieval; no separate context_store.
 """

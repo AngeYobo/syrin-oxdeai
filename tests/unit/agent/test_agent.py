@@ -601,7 +601,7 @@ def test_agent_model_config_returns_config() -> None:
     assert cfg.provider == "openai"
 
 
-# Agent name and description (v0.4.0 — discovery + routing)
+# Agent name and description (discovery + routing)
 
 
 def test_agent_name_defaults_to_lowercase_class_name() -> None:

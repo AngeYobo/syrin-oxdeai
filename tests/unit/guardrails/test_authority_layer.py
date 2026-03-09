@@ -1,4 +1,4 @@
-"""Comprehensive test suite for Syrin Guardrails Authority Layer (Phase 2).
+"""Comprehensive test suite for Syrin Guardrails Authority Layer.
 
 Test Driven Development approach - all tests written before implementation.
 """

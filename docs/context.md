@@ -142,7 +142,7 @@ result = agent.response("Long conversation...")
 | **formation_mode** | How conversation history is fed into context. | **FormationMode**: `push` (default), `pull`. | **push** = use conversation memory; **pull** = use agent's Memory for segment storage and retrieval. |
 | **pull_top_k** | When `formation_mode=pull`, max segments per turn. | **int** (≥ 0). Default 10. | **Context(pull_top_k=5)** to limit pulled segments. |
 | **pull_threshold** | When `formation_mode=pull`, min relevance score. | **float** (0.0–1.0). Default 0.0. | **Context(pull_threshold=0.5)** to filter low-relevance segments. |
-| **store_output_chunks** | Chunk long assistant replies and retrieve by relevance (Step 11). | **bool**. Default False. | **Context(store_output_chunks=True)** to reduce context bloat from long answers. |
+| **store_output_chunks** | Chunk long assistant replies and retrieve by relevance. | **bool**. Default False. | **Context(store_output_chunks=True)** to reduce context bloat from long answers. |
 | **output_chunk_top_k** | Max output chunks to include per turn when `store_output_chunks=True`. | **int** (≥ 0). Default 5. | **Context(output_chunk_top_k=10)**. |
 | **output_chunk_threshold** | Min relevance score (0.0–1.0) for output chunks. | **float**. Default 0.0. | **Context(output_chunk_threshold=0.2)**. |
 | **output_chunk_strategy** | How to split assistant content. | **OutputChunkStrategy**: `paragraph` (default), `fixed`. | **Context(output_chunk_strategy=OutputChunkStrategy.FIXED)**. |

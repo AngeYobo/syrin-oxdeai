@@ -1,4 +1,4 @@
-"""Tests for runtime context injection (Step 8).
+"""Tests for runtime context injection.
 
 TDD: Valid, invalid, and edge cases for PrepareInput, InjectPlacement,
 Context.runtime_inject, prepare(inject=...), and snapshot provenance.

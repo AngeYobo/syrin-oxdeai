@@ -174,6 +174,30 @@ class HandoffRetryRequested(SyrinError):
         self.format_hint = format_hint or message
 
 
+class NoMatchingProfileError(SyrinError):
+    """Raised when no router profile matches the required task type and modality.
+
+    Attributes:
+        message: Human-readable error message.
+        required_task_type: TaskType that was required (from classification or override).
+        required_modalities: Modalities present in the input that must be supported.
+        available_profiles: Profile names that were considered.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        required_task_type: Any = None,
+        required_modalities: Any = None,
+        available_profiles: list[str] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.required_task_type = required_task_type
+        self.required_modalities = required_modalities or set()
+        self.available_profiles = available_profiles or []
+
+
 class CircuitBreakerOpenError(SyrinError):
     """Raised when circuit breaker is open and request is blocked."""
 

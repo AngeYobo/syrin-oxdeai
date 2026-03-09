@@ -49,8 +49,10 @@ from syrin.model.providers import (
 
 setup_provider_namespaces(Model)
 
+# OpenRouter
 # Structured output
 from syrin.model.factory import create_model, make_model
+from syrin.model.openrouter_builder import OpenRouterBuilder
 from syrin.model.structured import (  # noqa: E402
     OutputType,
     StructuredOutput,
@@ -61,6 +63,7 @@ from syrin.model.structured import (  # noqa: E402
 __all__ = [
     # Core
     "Model",
+    "OpenRouterBuilder",
     "ModelRegistry",
     "ModelSettings",
     "ModelVariable",

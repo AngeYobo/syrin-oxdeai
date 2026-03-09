@@ -1,4 +1,4 @@
-"""Circuit Breaker Example (v0.3.0+).
+"""Circuit Breaker Example.
 
 Demonstrates:
 - Circuit breaker for LLM provider failures

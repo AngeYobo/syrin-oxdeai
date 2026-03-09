@@ -1,4 +1,4 @@
-"""Stored output chunks demo (Step 11).
+"""Stored output chunks demo.
 
 Shows store_output_chunks=True: long assistant replies are chunked by paragraph
 and stored; only chunks relevant to the current query are retrieved and added

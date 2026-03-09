@@ -1,4 +1,4 @@
-"""Tests for ContextStore protocol and InMemoryContextStore (Step 10)."""
+"""Tests for ContextStore protocol and InMemoryContextStore."""
 
 from __future__ import annotations
 

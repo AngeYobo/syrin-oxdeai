@@ -1,4 +1,4 @@
-"""Tests for stored output chunks (Step 11).
+"""Tests for stored output chunks.
 
 TDD: chunk assistant replies by paragraph; retrieve by relevance to current query.
 """

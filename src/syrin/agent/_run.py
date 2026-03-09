@@ -204,11 +204,15 @@ def _response_from_loop_result(
         if isinstance(result.stop_reason, str)
         else result.stop_reason
     )
+    effective_config = getattr(agent, "_active_model_config", None) or agent._model_config
+    model_id = effective_config.model_id
+    routing_reason = getattr(agent, "_last_routing_reason", None)
+    task_type = routing_reason.task_type if routing_reason is not None else None
     return ResponseClass(
         content=result.content,
         cost=result.cost_usd,
         tokens=tokens,
-        model=agent._model_config.model_id,
+        model=model_id,
         duration=result.latency_ms / 1000,
         tool_calls=tool_calls_list,
         stop_reason=stop_reason,
@@ -218,4 +222,8 @@ def _response_from_loop_result(
         structured=structured,
         report=agent._run_report,
         raw_response=result.raw_response,
+        routing_reason=routing_reason,
+        model_used=getattr(agent, "_last_model_used", None) or model_id,
+        task_type=task_type,
+        actual_cost=getattr(agent, "_last_actual_cost", None) or result.cost_usd,
     )

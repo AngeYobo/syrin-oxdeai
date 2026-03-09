@@ -57,10 +57,11 @@ Learn by doing! Pick a use case that matches what you want to build:
 **[Code quality](code-quality.md)** - mypy strict, ruff, public API typing, test coverage, and consistent patterns.
 
 **[Models Guide](models.md)** - Complete guide to models
-- Built-in models (OpenAI, Anthropic, Google, Ollama, LiteLLM)
-- Model.Custom for third-party APIs
-- Custom models via inheritance
-- Tweakable properties, fallbacks, structured output
+
+**[Routing](routing.md)** - Task classification and model routing
+- PromptClassifier, ModelProfile, ModelRouter, RouterConfig
+- Agent with model list + router_config
+- OpenRouter, DEFAULT_PROFILES, ROUTING_DECISION hook
 
 **[Concept Map](concept-map.md)** — Budget vs TokenLimits vs Memory (quick reference)
 
@@ -166,6 +167,7 @@ Trace and debug agent execution with spans and sessions. Use `debug=True` or `--
 - **Observability & Traces** → [Observability](observability.md) — use `debug=True` or `--trace` to see execution
 - **Agents** → [Agent Documentation](agent/README.md) — complete agent reference
 - **Models** → [Models Guide](models.md) — built-in, custom, inheritance
+- **Routing** → [Routing](routing.md) — model list, task classification, OpenRouter
 - **Tools** → [Use Case 2](research-agent-with-tools.md)
 - **Memory** → [Use Case 3](agent-with-memory.md)
 - **Budget** → [Use Case 4](budget-control.md)

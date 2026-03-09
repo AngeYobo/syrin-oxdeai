@@ -1,4 +1,4 @@
-"""Tests for context snapshot API (Step 2)."""
+"""Tests for context snapshot API."""
 
 from __future__ import annotations
 
@@ -350,7 +350,7 @@ class TestManagerSnapshotEdgeCases:
 
 
 # =============================================================================
-# CONTEXT STATS BREAKDOWN (Step 3)
+# CONTEXT STATS BREAKDOWN
 # =============================================================================
 
 

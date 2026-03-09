@@ -466,6 +466,17 @@ class ConsoleExporter(SpanExporter):
             lines.append(f"{prefix}  attributes:")
             lines.extend(attrs)
 
+        # Events (fallback, provider_error, etc.)
+        if span.events:
+            lines.append(f"{prefix}  events:")
+            for ev in span.events:
+                name = ev.get("name", "event")
+                ev_attrs = ev.get("attributes") or {}
+                ev_str = ", ".join(f"{k}={v}" for k, v in ev_attrs.items() if v is not None)
+                lines.append(
+                    f"{prefix}    - {name}: {ev_str}" if ev_str else f"{prefix}    - {name}"
+                )
+
         # Children (only when not in verbose mode for root, to avoid duplicate output)
         if include_children:
             for child in span.children:
@@ -833,6 +844,11 @@ class SemanticAttributes:
     # Error attributes
     ERROR_TYPE = "error.type"
     ERROR_MESSAGE = "error.message"
+
+    # Fallback and provider error attributes (used in span events)
+    LLM_FALLBACK_FROM = "llm.fallback.from_model"
+    LLM_FALLBACK_TO = "llm.fallback.to_model"
+    LLM_PROVIDER_ERROR_MODEL = "llm.provider_error.model"
 
 
 __all__ = [

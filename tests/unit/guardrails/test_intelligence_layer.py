@@ -1,4 +1,4 @@
-"""Comprehensive test suite for Syrin Guardrails Intelligence Layer (Phase 3).
+"""Comprehensive test suite for Syrin Guardrails Intelligence Layer.
 
 Test Driven Development approach - all tests written before implementation.
 """

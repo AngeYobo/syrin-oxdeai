@@ -48,10 +48,13 @@ class HookObserver:
             Hook.AGENT_RUN_START: obs.SpanKind.AGENT,
             Hook.LLM_REQUEST_START: obs.SpanKind.LLM,
             Hook.LLM_REQUEST_END: obs.SpanKind.LLM,
+            Hook.LLM_RETRY: obs.SpanKind.LLM,
+            Hook.LLM_FALLBACK: obs.SpanKind.LLM,
             Hook.TOOL_CALL_START: obs.SpanKind.TOOL,
             Hook.TOOL_ERROR: obs.SpanKind.INTERNAL,
             Hook.AGENT_RUN_END: obs.SpanKind.AGENT,
             Hook.BUDGET_CHECK: obs.SpanKind.BUDGET,
+            Hook.CIRCUIT_TRIP: obs.SpanKind.INTERNAL,
         }
 
         for event, kind in event_to_kind.items():
@@ -91,6 +94,16 @@ class HookObserver:
                     current.set_attribute(
                         obs.SemanticAttributes.BUDGET_REMAINING, ctx.get("remaining")
                     )
+                elif event_name == "llm_fallback" and "from_model" in ctx:
+                    current.set_attribute(
+                        obs.SemanticAttributes.LLM_FALLBACK_FROM, ctx.get("from_model")
+                    )
+                elif event_name == "llm_fallback" and "to_model" in ctx:
+                    current.set_attribute(
+                        obs.SemanticAttributes.LLM_FALLBACK_TO, ctx.get("to_model")
+                    )
+                elif event_name == "circuit_trip" and "error" in ctx:
+                    current.set_attribute(obs.SemanticAttributes.ERROR_MESSAGE, ctx.get("error"))
 
         return handler
 

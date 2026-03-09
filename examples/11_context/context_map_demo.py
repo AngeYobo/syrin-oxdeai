@@ -1,4 +1,4 @@
-"""Persistent context map demo (Step 12).
+"""Persistent context map demo.
 
 Shows map_backend="file", inject_map_summary=True: durable session index
 (topics, decisions, summary) survives resets. Map summary is injected at prepare

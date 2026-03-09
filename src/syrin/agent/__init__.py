@@ -131,6 +131,8 @@ from syrin.response import (
     StreamChunk,
     StructuredOutput,
 )
+from syrin.router import RouterConfig
+from syrin.router.agent_integration import build_router_from_models
 from syrin.serve.servable import Servable
 from syrin.tool import ToolSpec
 from syrin.types import CostInfo, Message, ModelConfig, ProviderResponse, TokenUsage
@@ -668,6 +670,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         inject_template_vars: bool = True,
         max_child_agents: int | None = None,
         config: AgentConfig | None = None,
+        router_config: RouterConfig | None = None,
     ) -> None:
         """Create an agent with model, prompt, tools, and optional config.
 
@@ -813,14 +816,47 @@ class Agent(Servable, metaclass=_AgentMeta):
         budget = _validate_budget(budget)
         if model is None:
             raise TypeError("Agent requires model (pass explicitly or set class-level model)")
-        if not isinstance(model, (Model, ModelConfig)):
+        models_list: list[Model] | None = None
+        if isinstance(model, list):
+            if not model:
+                raise TypeError(
+                    "model list cannot be empty. Use model=Model.X() or model=[M1, M2, ...]."
+                )
+            for i, m in enumerate(model):
+                if not isinstance(m, Model):
+                    raise TypeError(
+                        f"model[{i}] must be Model, got {type(m).__name__}. "
+                        "Use Model.OpenAI(), Model.Anthropic(), etc."
+                    )
+            models_list = model
+        elif isinstance(model, Model):
+            models_list = [model]
+        elif isinstance(model, ModelConfig):
+            models_list = None
+        else:
             raise TypeError(
-                f"model must be Model or ModelConfig, got {type(model).__name__}. "
-                "Use Model.OpenAI(), Model.Anthropic(), Model.Almock(), etc."
+                f"model must be Model, list[Model], or ModelConfig, got {type(model).__name__}. "
+                "Use Model.OpenAI(), [Model.OpenAI(), Model.Anthropic()], etc."
             )
-        if isinstance(model, Model):
-            self._model: Model | None = model
-            self._model_config = model.to_config()
+        self._router: Any = None
+        self._active_model: Model | None = None
+        self._active_model_config: ModelConfig | None = None
+        self._last_routing_reason: Any = None
+        self._last_model_used: str | None = None
+        self._last_actual_cost: float | None = None
+        self._call_task_override: Any = None
+        if models_list is not None:
+            if len(models_list) == 1 and router_config is None:
+                self._model = models_list[0]
+                self._model_config = self._model.to_config()
+            else:
+                self._router = build_router_from_models(
+                    models_list,
+                    router_config=router_config,
+                    budget=budget,
+                )
+                self._model = models_list[0]
+                self._model_config = self._model.to_config()
         else:
             self._model = None
             self._model_config = model
@@ -855,7 +891,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         self._parent_agent: Agent | None = None
         self._provider: Provider
 
-        # Extract advanced options from config (Phase 2: composition over flat params)
+        # Extract advanced options from config
         ctx = config.context if config else None
         rate_limit = config.rate_limit if config else None
         checkpoint = config.checkpoint if config else None
@@ -866,7 +902,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         audit = config.audit if config else None
         dependencies = config.dependencies if config else None
 
-        # Context component (Phase 3.1): manager and token limits
+        # Context component: manager and token limits
         if ctx is None:
             context_manager = DefaultContextManager(Context())
         elif isinstance(ctx, ContextConfig):
@@ -879,7 +915,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         token_limits = getattr(ctx_config, "token_limits", None) if ctx_config else None
         self._context_component = AgentContextComponent(context_manager, token_limits)
 
-        # Memory component (Phase 3.1)
+        # Memory component
         persistent_memory, memory_backend = _resolve_memory(memory)
         self._memory_component = AgentMemoryComponent(persistent_memory, memory_backend)
 
@@ -896,7 +932,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                     stacklevel=2,
                 )
 
-        # Budget component (Phase 3.1): state and persistence
+        # Budget component: state and persistence
         self._budget_component = AgentBudgetComponent(
             budget, budget_store, budget_store_key, self._context_component.token_limits
         )
@@ -949,7 +985,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         if max_child_agents is not None:
             self._max_child_agents = max_child_agents
 
-        # Guardrails component (Phase 3.1)
+        # Guardrails component
         if guardrails is None or (isinstance(guardrails, list) and len(guardrails) == 0):
             _guardrails = GuardrailChain()
         elif isinstance(guardrails, GuardrailChain):
@@ -958,7 +994,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             _guardrails = GuardrailChain(list(guardrails))
         self._guardrails_component = AgentGuardrailsComponent(_guardrails)
 
-        # Observability component (Phase 3.1)
+        # Observability component
         self._debug = debug
         _tracer: Tracer = tracer or get_tracer()
         if debug and not any(isinstance(e, ConsoleExporter) for e in _tracer._exporters):
@@ -1411,7 +1447,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             percent_used=round(percent, 2),
         )
 
-    # Phase 3.1: delegate to budget component (facade)
+    # Delegate to budget component (facade)
     @property
     def _budget_tracker(self) -> BudgetTracker:
         return self._budget_component.tracker
@@ -2737,20 +2773,89 @@ class Agent(Servable, metaclass=_AgentMeta):
     async def _complete_async(
         self, messages: list[Message], tools: list[ToolSpec] | None
     ) -> ProviderResponse:
-        """Async internal method to call LLM. Uses model.acomplete when fallbacks or transformers needed."""
+        """Async internal method to call LLM. Routes when _router is set."""
+        use_model = self._model
+        use_config = self._model_config
+        use_provider = self._provider
         provider_kwargs: dict[str, Any] = {}
-        if self._model is not None and hasattr(self._model, "_provider_kwargs"):
-            provider_kwargs = dict(getattr(self._model, "_provider_kwargs", {}))
-        # Use model.acomplete when model has fallbacks or response transformer (same provider instance)
-        if self._model is not None:
-            has_fallback = bool(getattr(self._model, "fallback", None))
-            has_transformer = bool(getattr(self._model, "_transformer", None))
+
+        if self._router is not None:
+            prompt = ""
+            for m in reversed(messages):
+                c = getattr(m, "content", None) or ""
+                if isinstance(c, str) and c.strip():
+                    prompt = c.strip()
+                    break
+            ctx: dict[str, object] = {}
+            if self._token_limits is not None:
+                ctx["max_output_tokens"] = getattr(self.run_context, "max_output_tokens", 1024)
+            try:
+                routed_model, task_type, reason = self._router.route(
+                    prompt,
+                    tools=tools,
+                    messages=messages,
+                    context=ctx,
+                    task_override=self._call_task_override,
+                )
+            except Exception:
+                raise
+            self._active_model = routed_model
+            self._active_model_config = routed_model.to_config()
+            self._last_routing_reason = reason
+            self._emit_event(
+                Hook.ROUTING_DECISION,
+                EventContext(
+                    routing_reason=reason,
+                    model=routed_model.model_id,
+                    task_type=task_type.value if hasattr(task_type, "value") else str(task_type),
+                    prompt=prompt[:200] if prompt else "",
+                ),
+            )
+            with self._tracer.span(
+                "routing.decision",
+                kind=SpanKind.INTERNAL,
+                attributes={
+                    "routing.model": reason.selected_model,
+                    "routing.model_id": routed_model.model_id,
+                    "routing.reason": reason.reason,
+                    "routing.task_type": task_type.value
+                    if hasattr(task_type, "value")
+                    else str(task_type),
+                    "routing.cost_estimate": reason.cost_estimate,
+                    "routing.confidence": reason.classification_confidence,
+                    "routing.alternatives": ",".join(reason.alternatives)
+                    if reason.alternatives
+                    else "",
+                },
+            ):
+                pass
+            use_model = routed_model
+            use_config = routed_model.to_config()
+            use_provider = routed_model.get_provider()
+
+        if use_model is not None and hasattr(use_model, "_provider_kwargs"):
+            provider_kwargs = dict(getattr(use_model, "_provider_kwargs", {}))
+        if use_model is not None:
+            has_fallback = bool(getattr(use_model, "fallback", None))
+            has_transformer = bool(getattr(use_model, "_transformer", None))
             if has_fallback or has_transformer:
-                result = await self._model.acomplete(messages, tools=tools, **provider_kwargs)
-                return cast(ProviderResponse, result)
-        return await self._provider.complete(
-            messages=messages, model=self._model_config, tools=tools, **provider_kwargs
-        )
+                result = await use_model.acomplete(messages, tools=tools, **provider_kwargs)
+                resp = cast(ProviderResponse, result)
+            else:
+                resp = await use_provider.complete(
+                    messages=messages, model=use_config, tools=tools, **provider_kwargs
+                )
+        else:
+            resp = await use_provider.complete(
+                messages=messages, model=use_config, tools=tools, **provider_kwargs
+            )
+        meta = getattr(resp, "metadata", None) or {}
+        if meta:
+            if "model_used" in meta:
+                self._last_model_used = meta.get("model_used")
+            if "actual_cost" in meta:
+                self._last_actual_cost = meta.get("actual_cost")
+        return resp
 
     def _resolve_fallback_provider(self) -> tuple[Provider, ModelConfig]:
         """Resolve fallback model to (provider, config). Cached."""
@@ -2788,6 +2893,14 @@ class Agent(Servable, metaclass=_AgentMeta):
         if cb is not None and not cb.allow_request():
             if cb.fallback is not None:
                 prov, cfg = self._resolve_fallback_provider()
+                self._emit_event(
+                    Hook.LLM_FALLBACK,
+                    EventContext(
+                        reason="circuit_breaker_open",
+                        from_model=getattr(self._model, "_model_id", str(self._model)),
+                        to_model=cfg.model_id,
+                    ),
+                )
                 provider_kwargs: dict[str, Any] = {}
                 if hasattr(self._model, "_provider_kwargs"):
                     provider_kwargs = dict(getattr(self._model, "_provider_kwargs", {}))
@@ -2945,6 +3058,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         *,
         inject: list[dict[str, Any]] | None = None,
         inject_source_detail: str | None = None,
+        task_type: Any = None,
     ) -> Response[str]:
         """Run the agent: LLM completion + tool loop. Synchronous.
 
@@ -2962,6 +3076,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             inject: Optional per-call context injection (RAG results, dynamic blocks).
                 Each item is a dict with ``role`` and ``content``. Overrides Context.runtime_inject when provided.
             inject_source_detail: Provenance label for inject (e.g. 'rag').
+            task_type: Override task type for routing (e.g. TaskType.CODE). Use for ambiguous prompts.
 
         Returns:
             Response with content, cost, tokens, model, stop_reason, structured
@@ -2976,6 +3091,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         self._call_template_vars = dict(template_variables) if template_variables else None
         self._call_inject = inject
         self._call_inject_source_detail = inject_source_detail
+        self._call_task_override = task_type
         try:
             self._run_report = AgentReport()
             if self._budget is not None or self._token_limits is not None:
@@ -2995,6 +3111,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             self._call_template_vars = None
             self._call_inject = None
             self._call_inject_source_detail = None
+            self._call_task_override = None
 
     async def arun(
         self,
@@ -3004,6 +3121,7 @@ class Agent(Servable, metaclass=_AgentMeta):
         *,
         inject: list[dict[str, Any]] | None = None,
         inject_source_detail: str | None = None,
+        task_type: Any = None,
     ) -> Response[str]:
         """Run the agent asynchronously. Same as response() but non-blocking.
 
@@ -3047,6 +3165,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             self._call_template_vars = None
             self._call_inject = None
             self._call_inject_source_detail = None
+            self._call_task_override = None
 
     def stream(
         self,

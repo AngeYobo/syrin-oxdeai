@@ -160,6 +160,7 @@ class ProviderResponse(BaseModel):
         token_usage: Input/output token counts. Use for cost and budget tracking.
         stop_reason: Why the model stopped (end_turn, tool_call, max_tokens, etc.).
         raw_response: Provider-specific raw response (OpenAI, Anthropic, etc.).
+        metadata: Optional provider metadata (e.g. OpenRouter: actual_cost, model_used).
     """
 
     content: str | None = Field(
@@ -181,6 +182,10 @@ class ProviderResponse(BaseModel):
     raw_response: object | None = Field(
         default=None,
         description="Provider-specific raw response (OpenAI, Anthropic, etc.).",
+    )
+    metadata: dict[str, object] = Field(
+        default_factory=dict,
+        description="Provider metadata (e.g. OpenRouter: actual_cost, model_used, openrouter_id).",
     )
 
     model_config = {"arbitrary_types_allowed": True}

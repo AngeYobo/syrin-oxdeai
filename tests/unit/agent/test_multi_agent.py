@@ -264,7 +264,7 @@ class TestSpawn:
 
 
 # -----------------------------------------------------------------------------
-# Step 4: Handoff & spawn hooks, HandoffBlocked, HandoffRetryRequested
+# Handoff & spawn hooks, HandoffBlocked, HandoffRetryRequested
 # -----------------------------------------------------------------------------
 
 

@@ -8,6 +8,7 @@ Complete guide to using and creating models in Syrin — from built-in providers
 
 Syrin models are the LLM backends your agents use. You can:
 - Use **built-in models** (OpenAI, Anthropic, Google, Ollama, LiteLLM)
+- Use **Model.OpenRouter** or **OpenRouterBuilder** — one API key for multiple providers (ideal for routing)
 - **Call models directly** with `model.complete()` or `model.acomplete()` (no Agent needed)
 - Use **Model.Custom** for third-party OpenAI-compatible APIs (DeepSeek, KIMI, Grok)
 - Create **custom models** via inheritance or the `make_model()` factory
@@ -24,6 +25,8 @@ API keys must be passed explicitly — the library never auto-reads from environ
 | No need for structured state | Multi-turn conversations with state |
 
 **Quick rule:** Need tools, memory, or budget? Use `Agent(model=...)`. Otherwise, `model.complete(messages)` is enough.
+
+**Multiple models?** Pass `model=[M1, M2, M3]` plus `router_config=RouterConfig(...)` to route per request by task, cost, and modality. See [Routing](routing.md) and [Agent: Model](agent/model.md).
 
 **No API key?** Use `Model.Almock()` to run without any provider — ideal for local development, CI, or trying the library. See [Almock (An LLM Mock)](#almock-an-llm-mock) below.
 
@@ -107,6 +110,42 @@ from syrin import Model
 model = Model.LiteLLM("openai/gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))
 model = Model.LiteLLM("anthropic/claude-3-5-sonnet", api_key=os.getenv("ANTHROPIC_API_KEY"))
 ```
+
+### OpenRouter — Single API Key for Multiple Providers
+
+Use one API key to access Anthropic, OpenAI, Google, and many other providers. Ideal for routing across models without managing multiple keys.
+
+```python
+import os
+from syrin.model import Model
+
+model = Model.OpenRouter(
+    "anthropic/claude-sonnet-4-5",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+)
+```
+
+**OpenRouterBuilder** — Create multiple models with one key for Agent routing:
+
+```python
+import os
+from syrin import Agent
+from syrin.model import Model, OpenRouterBuilder
+from syrin.router import RouterConfig, RoutingMode
+
+builder = OpenRouterBuilder(api_key=os.getenv("OPENROUTER_API_KEY"))
+claude = builder.model("anthropic/claude-sonnet-4-5")
+gpt = builder.model("openai/gpt-4o-mini")
+
+agent = Agent(
+    model=[claude, gpt],
+    router_config=RouterConfig(routing_mode=RoutingMode.COST_FIRST),
+)
+```
+
+Response headers (`x-openrouter-total-cost`, `x-openrouter-model-used`) populate `response.actual_cost` and `response.model_used` when available.
+
+See [Routing](routing.md) for full routing and Agent integration.
 
 ---
 
@@ -638,6 +677,7 @@ API keys are **not** auto-read from env; pass `api_key` explicitly. For `api_bas
 | Approach | Use when |
 |----------|----------|
 | `Model.OpenAI`, `Model.Anthropic`, etc. | Using built-in providers |
+| `Model.OpenRouter` / `OpenRouterBuilder` | One key for multiple providers (routing) |
 | `Model.Custom` | Third-party API with OpenAI-compatible format |
 | `create_model(provider, model_name)` | Provider/model from config (dynamic) |
 | `make_model()` | Reusable class for an OpenAI-compatible API |

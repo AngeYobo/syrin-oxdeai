@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class FieldSchema(BaseModel):
     """One configurable field: name, dotted path, type, default, constraints, enum values, nested children.
 
-    Used by schema extraction (Step 2) and by the dashboard to render and validate overrides.
+    Used by schema extraction and by the dashboard to render and validate overrides.
     Fields that are callables or internal are marked remote_excluded (read-only in dashboard).
 
     Attributes:

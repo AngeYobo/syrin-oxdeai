@@ -720,7 +720,7 @@ class PlanExecuteLoop(Loop):
             ),
         )
 
-        # Phase 1: Planning
+        # Planning
         plan_iteration = 0
         plan_response = None
 
@@ -767,7 +767,7 @@ class PlanExecuteLoop(Loop):
         if plan_response is None:
             plan_response = response
 
-        # Phase 2: Execution - ask for final execution
+        # Execution: ask for final execution
         messages.append(
             Message(
                 role=MessageRole.USER,

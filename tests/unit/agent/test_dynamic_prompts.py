@@ -1,4 +1,4 @@
-"""Tests for dynamic system prompt templates (Step 3)."""
+"""Tests for dynamic system prompt templates."""
 
 from __future__ import annotations
 

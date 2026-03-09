@@ -1,4 +1,4 @@
-"""Tests for custom compaction prompt (Step 4): Summarizer, ContextCompactor, Context."""
+"""Tests for custom compaction prompt: Summarizer, ContextCompactor, Context."""
 
 from __future__ import annotations
 

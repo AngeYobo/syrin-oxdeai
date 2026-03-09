@@ -919,8 +919,8 @@ agents:
     ) -> Response[str]:
         """Run dynamic agent pipeline using two-step approach.
 
-        Step 1: Ask LLM to plan which agents to spawn (returns JSON)
-        Step 2: Execute the planned agents explicitly
+        Ask LLM to plan which agents to spawn (returns JSON)
+        Execute the planned agents explicitly
 
         Args:
             task: The task to complete
@@ -953,7 +953,7 @@ agents:
         )
 
         try:
-            # Step 1: Get agent plan from LLM
+            # Get agent plan from LLM
             plan = self._get_agent_plan(task)
 
             # Emit DYNAMIC_PIPELINE_PLAN
@@ -966,7 +966,7 @@ agents:
                 ),
             )
 
-            # Step 2: Execute the planned agents
+            # Execute the planned agents
             result = self._execute_plan(plan, mode)
 
             # Emit DYNAMIC_PIPELINE_END
@@ -1001,7 +1001,7 @@ agents:
             raise
 
     def _get_agent_plan(self, task: str) -> list[AgentSpec]:
-        """Step 1: Ask LLM to plan which agents to spawn.
+        """Ask LLM to plan which agents to spawn.
 
         Returns a list of agent specs in JSON format.
         """
@@ -1095,7 +1095,7 @@ IMPORTANT: Return ONLY valid JSON, no other text."""
         return "\n".join(lines)
 
     def _execute_plan(self, plan: list[AgentSpec], mode: str) -> Response[str]:
-        """Step 2: Execute the planned agents."""
+        """Execute the planned agents."""
         if not plan:
             content = self._build_no_agents_message()
             return Response(content=content, cost=0, tokens=TokenUsage())

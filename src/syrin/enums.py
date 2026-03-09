@@ -352,6 +352,8 @@ class Hook(StrEnum):
 
     MODEL_SWITCH = "model.switch"
 
+    ROUTING_DECISION = "routing.decision"
+
     HANDOFF_START = "handoff.start"
     HANDOFF_END = "handoff.end"
     HANDOFF_BLOCKED = "handoff.blocked"

@@ -2,7 +2,7 @@
 
 > **Full guide:** For built-in models, Model.Custom, inheritance, and standalone `model.complete()`, see [Models Guide](../models.md).
 
-How agents use models: the `model` param, `switch_model()`, and integration with budget and rate limiting.
+How agents use models: the `model` param (single or list for routing), `router_config`, `switch_model()`, and integration with budget and rate limiting.
 
 ---
 
@@ -35,10 +35,39 @@ See [Constructor](constructor.md) for the full `model` parameter reference.
 The agent accepts any `Model` or `ModelConfig`:
 
 - `Model.OpenAI()`, `Model.Anthropic()`, `Model.Google()`, `Model.Ollama()`, `Model.LiteLLM()`
+- `Model.OpenRouter()` / `OpenRouterBuilder` — one API key for multiple providers
 - `Model.Custom()` for third-party OpenAI-compatible APIs
 - Custom models via inheritance
 
 All provider-specific options (temperature, max_tokens, api_key, etc.) are described in [Models Guide](../models.md).
+
+## Model List + Routing
+
+Pass a **list of models** with `router_config` to enable automatic per-request routing:
+
+```python
+from syrin import Agent, Budget
+from syrin.model import Model
+from syrin.router import RouterConfig, RoutingMode
+
+agent = Agent(
+    model=[
+        Model.Anthropic("claude-sonnet-4-5", api_key="..."),
+        Model.OpenAI("gpt-4o-mini", api_key="..."),
+    ],
+    router_config=RouterConfig(routing_mode=RoutingMode.AUTO),
+    system_prompt="You are helpful.",
+    budget=Budget(run=10.0),
+)
+
+# Agent routes each request by task, cost, and modality
+r = agent.response("write a sorting function")  # → Claude (CODE)
+r = agent.response("what is the weather?")      # → GPT-4o-mini (GENERAL)
+
+print(r.routing_reason.selected_model, r.model_used, r.actual_cost)
+```
+
+**RouterConfig options:** `routing_mode` (AUTO, COST_FIRST, QUALITY_FIRST), `force_model`, `classifier`, `routing_rule_callback`, budget thresholds. See [Routing](../routing.md) for full details.
 
 ---
 
@@ -143,6 +172,7 @@ except ProviderNotFoundError as e:
 
 ## See Also
 
+- [Routing](../routing.md) — Model list, RouterConfig, OpenRouter, task classification
 - [Models Guide](../models.md) — Built-ins, custom models, standalone `complete()`
 - [Constructor](constructor.md) — Full `model` parameter reference
 - [Budget](budget.md) — Budget thresholds and switch-model

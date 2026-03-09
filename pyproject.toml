@@ -44,6 +44,7 @@ qdrant = ["qdrant-client"]
 chroma = ["chromadb"]
 redis = ["redis"]
 postgres = ["psycopg2-binary"]
+classifier-embeddings = ["sentence-transformers"]
 dev = [
     "pytest",
     "pytest-asyncio",
@@ -157,6 +158,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "chromadb"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sentence_transformers"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

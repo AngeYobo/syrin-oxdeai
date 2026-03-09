@@ -306,6 +306,21 @@ from syrin.response import (
     Response,
     TokenReport,
 )
+from syrin.router import (
+    DEFAULT_PROFILES,
+    ClassificationResult,
+    ComplexityTier,
+    EmbeddingClassifier,
+    Modality,
+    ModalityDetector,
+    ModelProfile,
+    ModelRouter,
+    PromptClassifier,
+    RouterConfig,
+    RoutingMode,
+    RoutingReason,
+    TaskType,
+)
 from syrin.run_context import RunContext
 from syrin.serve import (
     AgentCard,
@@ -480,6 +495,19 @@ __all__ = [
     # =============================================================================
     "Pipe",
     "pipe",
+    "ClassificationResult",
+    "ComplexityTier",
+    "Modality",
+    "ModalityDetector",
+    "ModelProfile",
+    "ModelRouter",
+    "PromptClassifier",
+    "EmbeddingClassifier",
+    "RouterConfig",
+    "RoutingMode",
+    "RoutingReason",
+    "TaskType",
+    "DEFAULT_PROFILES",
     "prompt",
     "system_prompt",
     "validated",

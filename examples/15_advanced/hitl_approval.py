@@ -1,4 +1,4 @@
-"""Human-in-the-Loop Approval Example (v0.3.0+).
+"""Human-in-the-Loop Approval Example.
 
 Demonstrates:
 - Per-tool requires_approval with ApprovalGate

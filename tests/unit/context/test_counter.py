@@ -1,4 +1,4 @@
-"""Tests for TokenCounter and context breakdown (Step 3)."""
+"""Tests for TokenCounter and context breakdown."""
 
 from __future__ import annotations
 

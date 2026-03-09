@@ -21,6 +21,10 @@ print(response.model)     # Model ID used
 | `cost` | `float` | Cost in USD |
 | `tokens` | `TokenUsage` | Input/output/total tokens |
 | `model` | `str` | Model identifier |
+| `routing_reason` | `RoutingReason \| None` | When routing: why model was chosen (selected_model, task_type, reason, cost_estimate, etc.) |
+| `model_used` | `str \| None` | When routing/provider reports: actual model ID used (e.g. OpenRouter header) |
+| `task_type` | `TaskType \| None` | When routing: detected or overridden task type |
+| `actual_cost` | `float \| None` | When provider reports: actual cost (e.g. OpenRouter `x-openrouter-total-cost`) |
 | `duration` | `float` | Duration in seconds |
 | `budget_remaining` | `float \| None` | Remaining budget |
 | `budget_used` | `float \| None` | Budget used |
@@ -31,6 +35,8 @@ print(response.model)     # Model ID used
 | `raw_response` | `Any` | Provider raw response; parsed Pydantic for structured output |
 | `iterations` | `int` | Loop iterations |
 | `report` | `AgentReport` | Run metrics and sub-reports |
+
+**Routing metadata** — When using Agent with `model=[...]` and `router_config`, the response includes `routing_reason`, `model_used`, `task_type`, and `actual_cost` (when the provider reports it). See [Routing](../routing.md).
 
 ## String Conversion
 

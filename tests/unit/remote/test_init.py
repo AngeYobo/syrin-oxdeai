@@ -128,7 +128,7 @@ class TestOnAgentInitWhenDisabled:
         reg.unregister(agent_id)
 
     def test_agent_without_init_works_identically(self) -> None:
-        """Without syrin.init(), agent runs normally (response works like v0.5.0)."""
+        """Without syrin.init(), agent runs normally (response works)."""
         _reset_cloud_config()
         agent = _make_agent(name="no-init-run")
         r = agent.response("Say hello in one word.")

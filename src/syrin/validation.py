@@ -115,7 +115,7 @@ class ValidationPipeline:
                     ),
                 )
 
-            # Step 1: Parse JSON from raw text
+            # Parse JSON from raw text
             parsed, parse_error = self._parse_json(raw_output)
 
             if parse_error:
@@ -158,7 +158,7 @@ class ValidationPipeline:
                         )
                     return None, self.attempts, parse_error
 
-            # Step 2: Pydantic validation
+            # Pydantic validation
             pydantic_error, validated_model = self._validate_pydantic(parsed)
 
             if pydantic_error:
@@ -203,7 +203,7 @@ class ValidationPipeline:
             # Use the validated model (not the raw dict)
             parsed = validated_model
 
-            # Step 3: Custom validator (if provided)
+            # Custom validator (if provided)
             if self.validator:
                 validation_ctx = ValidationContext(
                     raw_output=raw_output,

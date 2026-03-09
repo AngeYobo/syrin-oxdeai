@@ -420,6 +420,59 @@ class Model:
         )
 
     @staticmethod
+    def OpenRouter(
+        model_id: str,
+        *,
+        api_key: str | None = None,
+        api_base: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        max_output_tokens: int | None = None,
+        top_p: float | None = None,
+        stop: list[str] | None = None,
+        context_window: int | None = None,
+        output: type | None = None,
+        input_price: float | None = None,
+        output_price: float | None = None,
+        fallback: list[Model] | None = None,
+        **kwargs: Any,
+    ) -> Model:
+        """Create an OpenRouter model. Single API, multiple providers.
+
+        Model ID format: provider/model (e.g. "anthropic/claude-sonnet-4-5",
+        "openai/gpt-4o-mini"). One API key for all models.
+
+        Args:
+            model_id: Full OpenRouter model ID (e.g. "anthropic/claude-sonnet-4-5").
+            api_key: OpenRouter API key. Required.
+            api_base: Override base URL. Default: https://openrouter.ai/api/v1.
+
+        Returns:
+            Model instance configured for OpenRouter.
+        """
+        import os
+
+        name = model_id.split("/")[-1] if "/" in model_id else model_id
+        return Model(
+            model_id=model_id,
+            name=name,
+            provider="openrouter",
+            api_base=api_base or os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1",
+            api_key=api_key or os.getenv("OPENROUTER_API_KEY"),
+            context_window=context_window,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            max_output_tokens=max_output_tokens,
+            top_p=top_p,
+            stop=stop,
+            output=output,
+            input_price=input_price,
+            output_price=output_price,
+            fallback=fallback,
+            **kwargs,
+        )
+
+    @staticmethod
     def LiteLLM(
         model_name: str,
         *,
@@ -995,6 +1048,10 @@ class Model:
             from syrin.providers.almock import AlmockProvider
 
             return AlmockProvider()
+        if self._provider == "openrouter":
+            from syrin.providers.openrouter import OpenRouterProvider
+
+            return OpenRouterProvider()
         if self._provider == "anthropic":
             from syrin.providers.anthropic import AnthropicProvider
 
@@ -1097,9 +1154,10 @@ class Model:
                 response = self._parse_structured_output(response)
 
             return response
-        except Exception:
+        except Exception as e:
+            self._record_provider_error_on_span(self._model_id, e)
             if self._fallback:
-                return self._try_fallback(messages, tools=tools, **kwargs)
+                return self._try_fallback(messages, tools=tools, initial_error=e, **kwargs)
             raise
 
     async def acomplete(
@@ -1168,9 +1226,10 @@ class Model:
                 response = self._parse_structured_output(response)
 
             return response
-        except Exception:
+        except Exception as e:
+            self._record_provider_error_on_span(self._model_id, e)
             if self._fallback:
-                return await self._atry_fallback(messages, tools=tools, **kwargs)
+                return await self._atry_fallback(messages, tools=tools, initial_error=e, **kwargs)
             raise
 
     async def _astream_internal(
@@ -1206,9 +1265,12 @@ class Model:
         try:
             async for chunk in provider.stream(messages, self.to_config(), tools, **settings):
                 yield chunk
-        except Exception:
+        except Exception as e:
+            self._record_provider_error_on_span(self._model_id, e)
             if self._fallback:
-                async for chunk in self._astream_fallback(messages, tools=tools, **kwargs):
+                async for chunk in self._astream_fallback(
+                    messages, tools=tools, initial_error=e, **kwargs
+                ):
                     yield chunk
             else:
                 raise
@@ -1313,18 +1375,63 @@ class Model:
                 cast(ProviderResponse, messages_or_response)
             )
 
+    def _record_provider_error_on_span(self, model_id: str, error: Exception) -> None:
+        """Record provider error on the current span for observability."""
+        try:
+            from syrin.observability import SemanticAttributes, current_span
+
+            span = current_span()
+            if span is not None:
+                span.add_event(
+                    "llm.provider_error",
+                    {
+                        SemanticAttributes.LLM_PROVIDER_ERROR_MODEL: model_id,
+                        SemanticAttributes.ERROR_TYPE: type(error).__name__,
+                        SemanticAttributes.ERROR_MESSAGE: str(error),
+                    },
+                )
+        except Exception:
+            pass
+
+    def _record_fallback_on_span(
+        self, from_model_id: str, to_model_id: str, error: Exception | None
+    ) -> None:
+        """Record fallback attempt on the current span for observability."""
+        try:
+            from syrin.observability import SemanticAttributes, current_span
+
+            span = current_span()
+            if span is not None:
+                attrs: dict[str, Any] = {
+                    SemanticAttributes.LLM_FALLBACK_FROM: from_model_id,
+                    SemanticAttributes.LLM_FALLBACK_TO: to_model_id,
+                }
+                if error is not None:
+                    attrs[SemanticAttributes.ERROR_TYPE] = type(error).__name__
+                    attrs[SemanticAttributes.ERROR_MESSAGE] = str(error)
+                span.add_event("llm.fallback", attrs)
+        except Exception:
+            pass
+
     def _try_fallback(
         self,
         messages: list[Message],
         *,
         tools: list[ToolSpec] | None = None,
+        initial_error: Exception | None = None,
         **kwargs: Any,
     ) -> ProviderResponse | Iterator[ProviderResponse]:
         """Try fallback models in order."""
+        failed_model_id = self._model_id
+        last_error = initial_error
         for fb in self._fallback:
             try:
+                self._record_fallback_on_span(failed_model_id, fb._model_id, last_error)
                 return fb.complete(messages, tools=tools, **kwargs)
-            except Exception:
+            except Exception as e:
+                last_error = e
+                self._record_provider_error_on_span(fb._model_id, e)
+                failed_model_id = fb._model_id
                 continue
         raise ProviderError("All fallback models failed")
 
@@ -1333,13 +1440,20 @@ class Model:
         messages: list[Message],
         *,
         tools: list[ToolSpec] | None = None,
+        initial_error: Exception | None = None,
         **kwargs: Any,
     ) -> ProviderResponse | AsyncIterator[ProviderResponse]:
         """Try fallback models in order (async)."""
+        failed_model_id = self._model_id
+        last_error = initial_error
         for fb in self._fallback:
             try:
+                self._record_fallback_on_span(failed_model_id, fb._model_id, last_error)
                 return await fb.acomplete(messages, tools=tools, **kwargs)
-            except Exception:
+            except Exception as e:
+                last_error = e
+                self._record_provider_error_on_span(fb._model_id, e)
+                failed_model_id = fb._model_id
                 continue
         raise ProviderError("All fallback models failed")
 
@@ -1348,15 +1462,22 @@ class Model:
         messages: list[Message],
         *,
         tools: list[ToolSpec] | None = None,
+        initial_error: Exception | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[ProviderResponse]:
         """Try fallback models in order for streaming."""
+        failed_model_id = self._model_id
+        last_error = initial_error
         for fb in self._fallback:
             try:
+                self._record_fallback_on_span(failed_model_id, fb._model_id, last_error)
                 async for chunk in fb.astream(messages, tools=tools, **kwargs):
                     yield chunk
                 return
-            except Exception:
+            except Exception as e:
+                last_error = e
+                self._record_provider_error_on_span(fb._model_id, e)
+                failed_model_id = fb._model_id
                 continue
         raise ProviderError("All fallback models failed")
 

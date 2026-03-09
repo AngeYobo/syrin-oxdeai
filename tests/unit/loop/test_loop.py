@@ -739,7 +739,7 @@ class TestLoopEdgeCases:
     """Edge cases for loop implementations."""
 
     def test_react_loop_max_iterations_zero(self):
-        """ReactLoop(max_iterations=0) raises ValueError (v0.3.0 validation)."""
+        """ReactLoop(max_iterations=0) raises ValueError."""
         with pytest.raises(ValueError, match=r"max_iterations must be int >= 1"):
             ReactLoop(max_iterations=0)
 
