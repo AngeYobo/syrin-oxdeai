@@ -381,6 +381,156 @@ body {
   cursor: not-allowed;
 }
 
+/* Multimodal input */
+.input-row.multimodality {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.input-row .attachment-preview {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.input-row .attachment-thumb {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.input-row .attachment-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.input-row .attachment-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border-radius: 50%;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.input-row .attachment-remove:hover {
+  background: var(--error);
+}
+
+.input-row .input-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.input-row .input-group input {
+  flex: 1;
+}
+
+.input-row .file-upload-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.input-row .file-upload-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.input-row .file-upload-btn input {
+  display: none;
+}
+
+/* Message attachments */
+.message-attachments {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.message-attachment {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 160px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.message-attachment-link {
+  display: block;
+  max-height: 160px;
+  overflow: hidden;
+  cursor: pointer;
+  line-height: 0;
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.message-attachment-link:hover {
+  opacity: 0.9;
+}
+
+.message-attachment-link img {
+  width: 100%;
+  height: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  display: block;
+}
+
+.message-attachment-download {
+  font-size: 0.7rem;
+  color: var(--accent);
+  padding: 0.2rem 0.4rem;
+  text-decoration: none;
+  text-align: center;
+}
+
+.message-attachment-download:hover {
+  color: var(--accent-hover);
+}
+
+.message.assistant .message-attachment {
+  border-color: var(--border);
+}
+
+.message-attachment-video {
+  max-width: 320px;
+}
+
+.message-attachment-video-el {
+  width: 100%;
+  max-height: 240px;
+  display: block;
+  background: #000;
+}
+
 /* Trace sidebar */
 .trace-sidebar-overlay {
   position: fixed;
@@ -433,6 +583,27 @@ body {
 .trace-sidebar-header h3 {
   margin: 0;
   font-size: 1rem;
+}
+
+.trace-sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.trace-copy-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.trace-copy-btn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
 }
 
 .trace-sidebar-close {
@@ -511,6 +682,113 @@ body {
     opacity: 1;
     transform: translate(-50%, -50%);
   }
+}
+
+/* Image viewer modal */
+.image-viewer-overlay {
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 200;
+}
+
+.image-viewer-modal {
+  position: fixed;
+  top: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  right: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  animation: image-viewer-fade-in 0.2s ease-out;
+  outline: none;
+}
+
+@keyframes image-viewer-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.image-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.image-viewer-zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.image-viewer-zoom button {
+  width: 2rem;
+  height: 2rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.image-viewer-zoom button:hover:not(:disabled) {
+  background: var(--border);
+}
+
+.image-viewer-zoom button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.image-viewer-zoom-val {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  min-width: 3.5rem;
+  text-align: center;
+}
+
+.image-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.image-viewer-download {
+  font-size: 0.85rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.image-viewer-download:hover {
+  color: var(--accent-hover);
+}
+
+.image-viewer-content {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  min-height: 0;
+}
+
+.image-viewer-content img {
+  max-width: 100%;
+  height: auto;
+  transition: transform 0.15s ease;
+  transform-origin: center center;
 }
 
 .modal-header {
@@ -741,6 +1019,23 @@ body {
   border-radius: 8px;
 }
 
+.trace-event-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.trace-event-header .trace-event-label {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.trace-copy-section {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+}
+
 .trace-event-label {
   font-size: 0.85rem;
   color: var(--text);
@@ -766,6 +1061,23 @@ body {
 .trace-event-val {
   color: var(--text);
   word-break: break-all;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.trace-event-val code {
+  font-size: 0.7rem;
+  max-width: 100%;
+}
+
+.trace-event-img-preview {
+  max-width: 80px;
+  max-height: 80px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--border);
 }
 
 .trace-meta {

@@ -45,6 +45,10 @@ chroma = ["chromadb"]
 redis = ["redis"]
 postgres = ["psycopg2-binary"]
 classifier-embeddings = ["sentence-transformers"]
+pdf = ["pypdf"]
+generation = [
+    "google-genai",
+]
 dev = [
     "pytest",
     "pytest-asyncio",
@@ -125,6 +129,14 @@ disallow_untyped_defs = false
 check_untyped_defs = false
 
 [[tool.mypy.overrides]]
+module = "anthropic"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "litellm"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "syrin.providers.anthropic"
 ignore_missing_imports = true
 
@@ -166,6 +178,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "chromadb.config"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "redis"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

@@ -7,7 +7,6 @@ import os
 
 from syrin.model import Model
 from syrin.router import (
-    ModelProfile,
     ModelRouter,
     RoutingMode,
     TaskType,
@@ -16,23 +15,25 @@ from syrin.router import (
 
 def main() -> None:
     api_key = os.getenv("OPENAI_API_KEY", "sk-demo")
-    profiles = [
-        ModelProfile(
-            model=Model.OpenAI("gpt-4o-mini", api_key=api_key),
-            name="general",
+    models = [
+        Model.OpenAI(
+            "gpt-4o-mini",
+            api_key=api_key,
+            profile_name="general",
             strengths=[TaskType.GENERAL, TaskType.CREATIVE],
             priority=90,
         ),
-        ModelProfile(
-            model=Model.OpenAI("gpt-4o", api_key=api_key),
-            name="code",
+        Model.OpenAI(
+            "gpt-4o",
+            api_key=api_key,
+            profile_name="code",
             strengths=[TaskType.CODE, TaskType.REASONING],
             priority=100,
         ),
     ]
 
     router = ModelRouter(
-        profiles=profiles,
+        models=models,
         routing_mode=RoutingMode.AUTO,
     )
 

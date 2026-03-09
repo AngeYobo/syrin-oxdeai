@@ -1,16 +1,15 @@
-"""Vision/modality routing — ModalityDetector routes image prompts to vision models.
+"""Vision/media routing — ModalityDetector routes image prompts to vision models.
 
 When messages contain images (base64 data URLs), router picks profiles with
-modality_input including IMAGE. Text-only profiles excluded.
+input_media including IMAGE. Text-only profiles excluded.
 """
 
 from __future__ import annotations
 
 from syrin import Agent
+from syrin.enums import Media
 from syrin.model import Model
 from syrin.router import (
-    Modality,
-    ModelProfile,
     ModelRouter,
     RouterConfig,
     RoutingMode,
@@ -20,31 +19,30 @@ from syrin.router import (
 
 def main() -> None:
     # Almock (no real vision; for structure demo)
-    text_model = Model.Almock(latency_min=0, latency_max=0)
-    vision_model = Model.Almock(latency_min=0, latency_max=0)
+    text_model = Model.Almock(
+        latency_min=0,
+        latency_max=0,
+        profile_name="text-only",
+        strengths=[TaskType.GENERAL, TaskType.CODE],
+        input_media={Media.TEXT},
+        output_media={Media.TEXT},
+        priority=90,
+    )
+    vision_model = Model.Almock(
+        latency_min=0,
+        latency_max=0,
+        profile_name="vision",
+        strengths=[TaskType.VISION, TaskType.GENERAL],
+        input_media={Media.TEXT, Media.IMAGE},
+        output_media={Media.TEXT},
+        priority=85,
+    )
 
-    profiles = [
-        ModelProfile(
-            model=text_model,
-            name="text-only",
-            strengths=[TaskType.GENERAL, TaskType.CODE],
-            modality_input={Modality.TEXT},
-            modality_output={Modality.TEXT},
-            priority=90,
-        ),
-        ModelProfile(
-            model=vision_model,
-            name="vision",
-            strengths=[TaskType.VISION, TaskType.GENERAL],
-            modality_input={Modality.TEXT, Modality.IMAGE},
-            modality_output={Modality.TEXT},
-            priority=85,
-        ),
-    ]
-    router = ModelRouter(profiles=profiles, routing_mode=RoutingMode.AUTO)
+    models_list = [text_model, vision_model]
+    router = ModelRouter(models=models_list, routing_mode=RoutingMode.AUTO)
 
     agent = Agent(
-        model=[text_model, vision_model],
+        model=models_list,
         router_config=RouterConfig(router=router),
         system_prompt="You are helpful.",
     )

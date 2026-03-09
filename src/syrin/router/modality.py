@@ -1,56 +1,62 @@
-"""ModalityDetector — detect modalities present in messages."""
+"""ModalityDetector — detect media types present in messages. Returns set[Media]."""
 
 from __future__ import annotations
 
-import re
-
-from syrin.router.enums import Modality
+from syrin.enums import Media
 from syrin.types import Message
 
-# Patterns for detecting modalities in message content (str)
-_BASE64_IMAGE = re.compile(
-    r"data:image/[a-zA-Z0-9+.+-]+;base64,[A-Za-z0-9+/=]+",
-    re.IGNORECASE,
-)
-_BASE64_VIDEO = re.compile(
-    r"data:video/[a-zA-Z0-9+.+-]+;base64,[A-Za-z0-9+/=]+",
-    re.IGNORECASE,
-)
-_BASE64_AUDIO = re.compile(
-    r"data:audio/[a-zA-Z0-9+.+-]+;base64,[A-Za-z0-9+/=]+",
-    re.IGNORECASE,
-)
+_PREFIX_LEN = 100
 
 
 class ModalityDetector:
-    """Detect modalities present in message content. Used by ModelRouter to filter profiles.
+    """Detect media types present in message content. Used by ModelRouter to filter profiles.
 
-    Inspects message content for base64 data URLs (image, video, audio).
-    TEXT is always included. IMAGE, VIDEO, AUDIO are added when detected.
+    Returns set[Media]. TEXT is always included; IMAGE, VIDEO, AUDIO, FILE added when detected.
+    Uses prefix-only checks for string content (avoids regex on large base64 payloads).
+    Supports structured content (list of parts with type: image_url, image, video, etc.).
     """
 
-    def detect(self, messages: list[Message]) -> set[Modality]:
-        """Return set of modalities present in message content.
-
-        Args:
-            messages: List of Message objects.
-
-        Returns:
-            Set of Modality (always includes TEXT; adds IMAGE, VIDEO, AUDIO as present).
-        """
+    def detect(self, messages: list[Message]) -> set[Media]:
+        """Return set of Media present in message content."""
         if not isinstance(messages, list):
             raise TypeError(
                 f"ModalityDetector.detect requires list[Message]; got {type(messages).__name__}."
             )
-        result: set[Modality] = {Modality.TEXT}
+        result: set[Media] = {Media.TEXT}
         for msg in messages:
             content = getattr(msg, "content", None) or ""
-            if not isinstance(content, str):
-                continue
-            if _BASE64_IMAGE.search(content):
-                result.add(Modality.IMAGE)
-            if _BASE64_VIDEO.search(content):
-                result.add(Modality.VIDEO)
-            if _BASE64_AUDIO.search(content):
-                result.add(Modality.AUDIO)
+            if isinstance(content, list):
+                self._detect_structured(content, result)
+            elif isinstance(content, str):
+                self._detect_string(content, result)
         return result
+
+    def _detect_string(self, content: str, result: set[Media]) -> None:
+        prefix = content[:_PREFIX_LEN]
+        if "data:image" in prefix:
+            result.add(Media.IMAGE)
+        if "data:video" in prefix:
+            result.add(Media.VIDEO)
+        if "data:audio" in prefix:
+            result.add(Media.AUDIO)
+        if "data:application" in prefix:
+            result.add(Media.FILE)
+        if "file_url" in prefix or ('"type"' in prefix and "file" in prefix[:200]):
+            result.add(Media.FILE)
+
+    def _detect_structured(self, parts: list[object], result: set[Media]) -> None:
+        for part in parts:
+            if not isinstance(part, dict):
+                continue
+            t = part.get("type", "")
+            if not isinstance(t, str):
+                continue
+            t_lower = t.lower()
+            if t_lower in ("image_url", "image"):
+                result.add(Media.IMAGE)
+            elif t_lower == "video":
+                result.add(Media.VIDEO)
+            elif t_lower == "audio":
+                result.add(Media.AUDIO)
+            elif t_lower == "file":
+                result.add(Media.FILE)

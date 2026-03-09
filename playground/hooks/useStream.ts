@@ -10,9 +10,16 @@ export interface BudgetData {
   percent_used?: number;
 }
 
+export interface MessageAttachment {
+  url: string;
+  type: string;
+  contentType?: string;
+}
+
 export interface MessageData {
   role: "user" | "assistant";
   content: string;
+  attachments?: MessageAttachment[];
   meta?: string;
   isError?: boolean;
   events?: Array<{ hook: string; ctx: Record<string, unknown> }>;
@@ -146,6 +153,7 @@ export interface StreamCallbacks {
     tokens?: Record<string, number>;
     events?: Array<{ hook: string; ctx: Record<string, unknown> }>;
     budget?: BudgetData;
+    attachments?: Array<{ type: string; url: string; content_type?: string }>;
   }) => void;
   onError: (err: Error) => void;
 }
@@ -195,12 +203,14 @@ export function createStreamProcessor(
               tokens?: Record<string, number>;
               events?: Array<{ hook: string; ctx: Record<string, unknown> }>;
               budget?: BudgetData;
+              attachments?: Array<{ type: string; url: string; content_type?: string }>;
             };
             callbacks.onDone({
               cost: d.cost,
               tokens: d.tokens,
               events: d.events,
               budget: d.budget,
+              attachments: d.attachments,
             });
             continue;
           }
@@ -218,12 +228,14 @@ export function createStreamProcessor(
               tokens?: Record<string, number>;
               events?: Array<{ hook: string; ctx: Record<string, unknown> }>;
               budget?: BudgetData;
+              attachments?: Array<{ type: string; url: string; content_type?: string }>;
             };
             callbacks.onDone({
               cost: d.cost,
               tokens: d.tokens,
               events: d.events,
               budget: d.budget,
+              attachments: d.attachments,
             });
           } else if ((data as { text?: string }).text != null) {
             const acc = (data as { accumulated?: string }).accumulated ?? "";

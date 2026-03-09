@@ -9,7 +9,6 @@ from __future__ import annotations
 from syrin import Agent
 from syrin.model import Model
 from syrin.router import (
-    ModelProfile,
     ModelRouter,
     RouterConfig,
     RoutingMode,
@@ -18,22 +17,23 @@ from syrin.router import (
 
 
 def main() -> None:
-    a = Model.Almock(latency_min=0, latency_max=0)
-    b = Model.Almock(latency_min=0, latency_max=0)
+    a = Model.Almock(
+        latency_min=0, latency_max=0, profile_name="a", strengths=[TaskType.GENERAL], priority=90
+    )
+    b = Model.Almock(
+        latency_min=0, latency_max=0, profile_name="b", strengths=[TaskType.CODE], priority=100
+    )
     forced = Model.Almock(latency_min=0, latency_max=0)
 
-    profiles = [
-        ModelProfile(model=a, name="a", strengths=[TaskType.GENERAL], priority=90),
-        ModelProfile(model=b, name="b", strengths=[TaskType.CODE], priority=100),
-    ]
+    models_list = [a, b]
     router = ModelRouter(
-        profiles=profiles,
+        models=models_list,
         routing_mode=RoutingMode.AUTO,
         force_model=forced,
     )
 
     agent = Agent(
-        model=[a, b, forced],
+        model=[*models_list, forced],
         router_config=RouterConfig(router=router),
         system_prompt="You are helpful.",
     )

@@ -101,10 +101,13 @@ def build_router(
     def _route(path: str) -> str:
         return f"{prefix}{path}" if prefix else path
 
-    def _chat_body(r: dict[str, Any]) -> tuple[str, str | None]:
+    def _chat_body(r: dict[str, Any]) -> tuple[str | list[dict[str, Any]], str | None]:
+        """Extract message (str or multimodal content parts) and conversation_id."""
         message = r.get("message") or r.get("input") or r.get("content")
         if isinstance(message, str):
             return message.strip(), r.get("conversation_id")
+        if isinstance(message, list) and all(isinstance(p, dict) for p in message):
+            return message, r.get("conversation_id")
         return "", None
 
     collect_debug = config.debug and config.enable_playground
@@ -134,6 +137,13 @@ def build_router(
                 events_list = []
             elapsed = time.perf_counter() - start
             out: dict[str, Any] = {"content": str(r.content)}
+            attachments = getattr(r, "attachments", None) or []
+            if attachments:
+                out["attachments"] = [
+                    {"type": a.type, "url": a.url, "content_type": getattr(a, "content_type", "")}
+                    for a in attachments
+                    if getattr(a, "url", None)
+                ]
             if config.include_metadata:
                 out["cost"] = r.cost
                 out["tokens"] = {
@@ -184,23 +194,51 @@ def build_router(
             )
 
         async def sse_gen() -> Any:
+            import logging
+
+            _log = logging.getLogger("syrin.serve")
             accumulated = ""
             events_list: list[tuple[str, dict[str, Any]]] = []
             tokens_val: dict[str, Any] | None = None
+            attachments_from_result: list[dict[str, Any]] = []
             progressive = collect_debug
 
             # When agent has tools, run the full REACT loop so tool calls are executed and
             # the user gets the real reply instead of the "model chose to use a tool" fallback.
-            agent_tools = getattr(agent, "tools", None)
+            # Use _tools (internal list) so we never skip the loop when tools exist but are filtered.
+            agent_tools = getattr(agent, "_tools", None) or getattr(agent, "tools", None)
             if agent_tools and len(agent_tools) > 0:
                 if progressive:
                     yield _emit({"type": "status", "message": "Thinking…"})
                 from syrin.serve.playground import _collect_events
 
-                with _collect_events() as evts:
-                    result = await agent.arun(msg)
+                try:
+                    with _collect_events() as evts:
+                        result = await agent.arun(msg)
+                except Exception as run_err:
+                    _log.exception("Agent run failed: %s", run_err)
+                    if progressive:
+                        yield _emit(
+                            {
+                                "type": "error",
+                                "error": str(run_err),
+                                "observability": "Error logged; check trace/debug output",
+                            }
+                        )
+                    yield _emit({"type": "error", "error": str(run_err)})
+                    return
                 events_list = list(evts)
                 accumulated = result.content or ""
+                atts = getattr(result, "attachments", None) or []
+                attachments_from_result = [
+                    {
+                        "type": a.type,
+                        "url": getattr(a, "url", None),
+                        "content_type": getattr(a, "content_type", ""),
+                    }
+                    for a in atts
+                    if getattr(a, "url", None)
+                ]
                 if accumulated:
                     if progressive:
                         yield _emit(
@@ -306,6 +344,8 @@ def build_router(
                     done["tokens"] = tokens_val
             if collect_debug and events_list:
                 done["events"] = [{"hook": h, "ctx": c} for h, c in events_list]
+            if attachments_from_result:
+                done["attachments"] = attachments_from_result
             yield _emit(done)
 
         return StreamingResponse(

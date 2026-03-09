@@ -147,7 +147,13 @@ class AnthropicProvider(Provider):
 
         system_list: list[Message] = [m for m in messages if m.role == MessageRole.SYSTEM]
         rest = [m for m in messages if m.role != MessageRole.SYSTEM]
-        system_prompt = "\n".join(m.content for m in system_list) if system_list else ""
+        system_prompt = (
+            "\n".join(
+                (m.content if isinstance(m.content, str) else str(m.content)) for m in system_list
+            )
+            if system_list
+            else ""
+        )
         api_messages = [_message_to_anthropic(m) for m in rest]
 
         api_key = model.api_key

@@ -51,6 +51,40 @@ def _llm_span_context(ctx: Any, iteration: int, model_id: str) -> Any:
     )
 
 
+# Max chars for tool results containing base64 data URLs before truncating (avoids 429 from LLM token limits)
+_MAX_TOOL_RESULT_FOR_LLM = 2000
+
+
+def _extract_media_url_from_tool_result(result: str) -> tuple[str | None, str | None]:
+    """Extract data URL from generate_image/generate_video tool result. Returns (url, media_type)."""
+    if not result:
+        return None, None
+    if result.startswith("Generated image: ") and "data:image" in result:
+        url = result.split("Generated image: ", 1)[1].strip()
+        if url.startswith("data:"):
+            return url, "image"
+    if result.startswith("Generated video: ") and "data:video" in result:
+        url = result.split("Generated video: ", 1)[1].strip()
+        if url.startswith("data:"):
+            return url, "video"
+    return None, None
+
+
+def _truncate_tool_result_for_context(result: str) -> str:
+    """Truncate large base64 data URLs in tool results to avoid blowing up LLM context (429)."""
+    if not result or len(result) <= _MAX_TOOL_RESULT_FOR_LLM:
+        return result
+    if "data:image" in result or "data:video" in result:
+        prefix = result.split(";base64,")[0] if ";base64," in result else result[:80]
+        size_kb = len(result) // 1024
+        return (
+            f"{prefix}; [base64 data omitted, ~{size_kb}KB - exceeds context limit. "
+            "The generation succeeded. Inform the user the image/video was created.]"
+        )
+    # Generic truncation for other large outputs
+    return result[:_MAX_TOOL_RESULT_FOR_LLM] + " [...] (truncated)"
+
+
 def _tool_span_context(ctx: Any, tool_name: str, tool_args: dict[str, Any], iteration: int) -> Any:
     """Context manager for tool span when ctx.tracer is set; else no-op."""
     tracer = _get_tracer(ctx)
@@ -98,6 +132,7 @@ class LoopResult:
     )
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     raw_response: Any = None
+    generated_media: list[dict[str, Any]] = field(default_factory=list)
 
 
 # Type for tool approval callback: (tool_name, args) -> approved
@@ -117,7 +152,9 @@ class Loop:
 
     name: str = "base"
 
-    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
+    async def run(
+        self, ctx: AgentRunContext | Any, user_input: str | list[dict[str, Any]]
+    ) -> LoopResult:
         """Execute the loop. Override in subclasses.
 
         Args:
@@ -139,7 +176,9 @@ class SingleShotLoop(Loop):
 
     name = "single_shot"
 
-    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
+    async def run(
+        self, ctx: AgentRunContext | Any, user_input: str | list[dict[str, Any]]
+    ) -> LoopResult:
         """Execute single LLM call. No tool execution or iteration."""
         from syrin.cost import calculate_cost
         from syrin.events import EventContext
@@ -249,7 +288,9 @@ class ReactLoop(Loop):
             )
         self.max_iterations = max_iterations
 
-    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
+    async def run(
+        self, ctx: AgentRunContext | Any, user_input: str | list[dict[str, Any]]
+    ) -> LoopResult:
         """Execute REACT loop."""
         from syrin.cost import calculate_cost
         from syrin.events import EventContext
@@ -260,6 +301,7 @@ class ReactLoop(Loop):
         iteration = 0
         tools_used = []
         tool_calls_all = []
+        generated_media: list[dict[str, Any]] = []
         run_start = time.perf_counter()
 
         ctx.emit_event(
@@ -390,10 +432,16 @@ class ReactLoop(Loop):
                             tool_span.set_attribute(
                                 SemanticAttributes.TOOL_OUTPUT, str(result)[:500]
                             )
+                    result_str = str(result)
+                    content_for_llm = _truncate_tool_result_for_context(result_str)
+                    url, media_type = _extract_media_url_from_tool_result(result_str)
+                    if url and media_type:
+                        ct = "image/png" if media_type == "image" else "video/mp4"
+                        generated_media.append({"type": media_type, "url": url, "content_type": ct})
                     messages.append(
                         Message(
                             role=MessageRole.TOOL,
-                            content=result,
+                            content=content_for_llm,
                             tool_call_id=tc.id,
                         )
                     )
@@ -464,6 +512,7 @@ class ReactLoop(Loop):
                 "total": total_input + total_output,
             },
             tool_calls=tool_calls_all,
+            generated_media=generated_media,
             raw_response=response.raw_response,
         )
 
@@ -504,7 +553,9 @@ class HumanInTheLoop(Loop):
         self._timeout = timeout
         self.max_iterations = max_iterations
 
-    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
+    async def run(
+        self, ctx: AgentRunContext | Any, user_input: str | list[dict[str, Any]]
+    ) -> LoopResult:
         """Execute loop with human approval."""
         from syrin.cost import calculate_cost
         from syrin.events import EventContext
@@ -515,6 +566,7 @@ class HumanInTheLoop(Loop):
         iteration = 0
         tools_used = []
         tool_calls_all = []
+        generated_media: list[dict[str, Any]] = []
         run_start = time.perf_counter()
 
         ctx.emit_event(
@@ -615,10 +667,16 @@ class HumanInTheLoop(Loop):
 
                 try:
                     result = await ctx.execute_tool(tool_name, tool_args)
+                    result_str = str(result)
+                    content_for_llm = _truncate_tool_result_for_context(result_str)
+                    url, media_type = _extract_media_url_from_tool_result(result_str)
+                    if url and media_type:
+                        ct = "image/png" if media_type == "image" else "video/mp4"
+                        generated_media.append({"type": media_type, "url": url, "content_type": ct})
                     messages.append(
                         Message(
                             role=MessageRole.TOOL,
-                            content=result,
+                            content=content_for_llm,
                             tool_call_id=tc.id,
                         )
                     )
@@ -673,6 +731,7 @@ class HumanInTheLoop(Loop):
                 "total": total_input + total_output,
             },
             tool_calls=tool_calls_all,
+            generated_media=generated_media,
             raw_response=response.raw_response,
         )
 
@@ -696,17 +755,29 @@ class PlanExecuteLoop(Loop):
         self.max_plan_iterations = max_plan_iterations
         self.max_execution_iterations = max_execution_iterations
 
-    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
+    async def run(
+        self, ctx: AgentRunContext | Any, user_input: str | list[dict[str, Any]]
+    ) -> LoopResult:
         """Execute PLAN → EXECUTE → REVIEW loop."""
         from syrin.cost import calculate_cost
         from syrin.events import EventContext
         from syrin.types import Message, TokenUsage
 
-        messages = ctx.build_messages(
+        plan_prompt: str | list[dict[str, Any]] = (
             user_input
             + "\n\nPlease provide a detailed plan with numbered steps to accomplish this task."
+            if isinstance(user_input, str)
+            else user_input
+            + [
+                {
+                    "role": "user",
+                    "content": "Please provide a detailed plan with numbered steps to accomplish this task.",
+                }
+            ]
         )
+        messages = ctx.build_messages(plan_prompt)
         tools = ctx.tools
+        generated_media: list[dict[str, Any]] = []
         run_start = time.perf_counter()
         total_input = 0
         total_output = 0
@@ -751,10 +822,16 @@ class PlanExecuteLoop(Loop):
                         )
                     )
                     tool_result = await ctx.execute_tool(tc.name, tc.arguments or {})
+                    result_str = str(tool_result)
+                    content_for_llm = _truncate_tool_result_for_context(result_str)
+                    url, media_type = _extract_media_url_from_tool_result(result_str)
+                    if url and media_type:
+                        ct = "image/png" if media_type == "image" else "video/mp4"
+                        generated_media.append({"type": media_type, "url": url, "content_type": ct})
                     messages.append(
                         Message(
                             role=MessageRole.TOOL,
-                            content=tool_result,
+                            content=content_for_llm,
                             tool_call_id=tc.id,
                         )
                     )
@@ -812,10 +889,16 @@ class PlanExecuteLoop(Loop):
 
             for tc in response.tool_calls:
                 tool_result = await ctx.execute_tool(tc.name, tc.arguments or {})
+                result_str = str(tool_result)
+                content_for_llm = _truncate_tool_result_for_context(result_str)
+                url, media_type = _extract_media_url_from_tool_result(result_str)
+                if url and media_type:
+                    ct = "image/png" if media_type == "image" else "video/mp4"
+                    generated_media.append({"type": media_type, "url": url, "content_type": ct})
                 messages.append(
                     Message(
                         role=MessageRole.TOOL,
-                        content=tool_result,
+                        content=content_for_llm,
                         tool_call_id=tc.id,
                     )
                 )
@@ -864,6 +947,7 @@ class PlanExecuteLoop(Loop):
                 "total": total_input + total_output,
             },
             tool_calls=[],
+            generated_media=generated_media,
             raw_response=final_response.raw_response,
         )
 
@@ -887,7 +971,9 @@ class CodeActionLoop(Loop):
         self.max_iterations = max_iterations
         self.timeout_seconds = timeout_seconds
 
-    async def run(self, ctx: AgentRunContext | Any, user_input: str) -> LoopResult:
+    async def run(
+        self, ctx: AgentRunContext | Any, user_input: str | list[dict[str, Any]]
+    ) -> LoopResult:
         """Execute CODE → EXECUTE → INTERPRET loop."""
         import re
 

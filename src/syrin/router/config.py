@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field, model_validator
 from syrin.model import Model
 from syrin.router.classifier import PromptClassifier
 from syrin.router.enums import RoutingMode, TaskType
-from syrin.router.profile import ModelProfile
 
 # Import last to avoid circular: ModelRouter imports classifier, profile, etc.
 from syrin.router.router import ModelRouter
@@ -18,16 +17,23 @@ from syrin.router.router import ModelRouter
 class RouterConfig(BaseModel):
     """Configuration for model selection and routing. Use with Agent(router_config=...).
 
+    Example::
+
+        config = RouterConfig(
+            routing_mode=RoutingMode.COST_FIRST,
+            budget_optimisation=True,
+            prefer_cheaper_below_budget_ratio=0.20,
+        )
+        agent = Agent(model=[claude, gpt], router_config=config)
+
     Attributes:
         router: Explicit ModelRouter. If set, overrides auto-created router from model list.
         classifier: Custom PromptClassifier. None = use default (embeddings).
         routing_mode: AUTO, COST_FIRST, QUALITY_FIRST, or MANUAL.
         force_model: Bypass routing; always use this model.
         budget_optimisation: When True, prefer cheaper models when budget runs low.
-        economy_at: Fraction (0–1). When remaining/limit < this, prefer cheaper capable models.
-        cheapest_at: Fraction (0–1). When remaining/limit < this, force cheapest capable model.
-        max_cost_per_1k_tokens: Cap on cost per 1K tokens when selecting models.
-        profiles: Custom profiles (override auto-generated from model list).
+        prefer_cheaper_below_budget_ratio: When remaining/limit < this, prefer cheaper capable models.
+        force_cheapest_below_budget_ratio: When remaining/limit < this, force cheapest capable model.
         routing_rule_callback: Custom callback(prompt, task_type, profile_names) -> profile_name | None.
     """
 
@@ -51,9 +57,9 @@ class RouterConfig(BaseModel):
     )
     budget_optimisation: bool = Field(
         default=True,
-        description="When True, prefer cheaper models when budget runs low (use economy_at and cheapest_at).",
+        description="When True, prefer cheaper models when budget runs low.",
     )
-    economy_at: float = Field(
+    prefer_cheaper_below_budget_ratio: float = Field(
         default=0.20,
         ge=0.0,
         le=1.0,
@@ -62,23 +68,14 @@ class RouterConfig(BaseModel):
             "router prefers cheaper capable models. Default 0.20."
         ),
     )
-    cheapest_at: float = Field(
+    force_cheapest_below_budget_ratio: float = Field(
         default=0.10,
         ge=0.0,
         le=1.0,
         description=(
             "Fraction (0–1) of remaining budget. When remaining/limit < this, "
-            "router forces cheapest capable model. Default 0.10. Must be <= economy_at."
+            "router forces cheapest capable model. Default 0.10. Must be <= prefer_cheaper_below_budget_ratio."
         ),
-    )
-    max_cost_per_1k_tokens: float | None = Field(
-        default=None,
-        ge=0.0,
-        description="Max cost per 1K tokens when selecting models. None = no cap.",
-    )
-    profiles: list[ModelProfile] | None = Field(
-        default=None,
-        description="Custom profiles. Override auto-generated from model list.",
     )
     routing_rule_callback: Callable[[str, TaskType, list[str]], str | None] | None = Field(
         default=None,
@@ -86,11 +83,29 @@ class RouterConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _validate_cheapest_le_economy(self) -> RouterConfig:
-        if self.cheapest_at > self.economy_at:
+    def _warn_ignored_when_router_set(self) -> RouterConfig:
+        import warnings
+
+        if self.router is not None:
+            ignored = []
+            if self.routing_mode != RoutingMode.AUTO:
+                ignored.append("routing_mode")
+            if self.classifier is not None:
+                ignored.append("classifier")
+            if ignored:
+                warnings.warn(
+                    f"RouterConfig.router is set — {', '.join(ignored)} will be ignored. "
+                    "Configure these on the ModelRouter directly.",
+                    stacklevel=2,
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_cheapest_le_prefer(self) -> RouterConfig:
+        if self.force_cheapest_below_budget_ratio > self.prefer_cheaper_below_budget_ratio:
             raise ValueError(
-                f"cheapest_at ({self.cheapest_at}) must be <= economy_at ({self.economy_at}). "
-                "Adjust RouterConfig."
+                f"force_cheapest_below_budget_ratio ({self.force_cheapest_below_budget_ratio}) "
+                f"must be <= prefer_cheaper_below_budget_ratio ({self.prefer_cheaper_below_budget_ratio})."
             )
         return self
 

@@ -8,6 +8,7 @@ import {
   createStreamProcessor,
   formatHookLabelForActivity,
   type MessageData,
+  type MessageAttachment,
   type ActivityEntry,
 } from "@/hooks/useStream";
 import { AgentIcon } from "@/components/AgentIcon";
@@ -24,6 +25,7 @@ export default function PlaygroundPage() {
   const [selectedAgent, setSelectedAgent] = useState("");
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [sending, setSending] = useState(false);
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [traceSidebar, setTraceSidebar] = useState<{
@@ -66,13 +68,37 @@ export default function PlaygroundPage() {
     []
   );
 
+  const buildMessageBody = useCallback(
+    (text: string, atts: MessageAttachment[]): string | object[] => {
+      if (atts.length === 0) return text || "";
+      const parts: object[] = [];
+      if (text) parts.push({ type: "text", text });
+      for (const a of atts) {
+        if (a.type === "image")
+          parts.push({ type: "image_url", image_url: { url: a.url } });
+        else parts.push({ type: "text", text: `[File: ${a.contentType || "file"}]` });
+      }
+      return parts;
+    },
+    []
+  );
+
   const sendMessage = useCallback(async () => {
     const text = input.trim();
-    if (!text || !config || sending) return;
+    if ((!text && attachments.length === 0) || !config || sending) return;
 
+    const userAttachments = [...attachments];
     setInput("");
+    setAttachments([]);
     setSending(true);
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        content: text || "(attachments only)",
+        attachments: userAttachments.length ? userAttachments : undefined,
+      },
+    ]);
     setMessages((prev) => [...prev, { role: "assistant", content: "", events: undefined }]);
     setActivities([]);
 
@@ -119,6 +145,11 @@ export default function PlaygroundPage() {
           if (t) parts.push(`${t} tokens`);
         }
         meta = parts.join(" · ");
+        const atts: MessageAttachment[] = (opts.attachments ?? []).map((a) => ({
+          url: a.url,
+          type: a.type,
+          contentType: a.content_type,
+        }));
         setMessages((prev) => {
           const next = [...prev];
           const last = next[next.length - 1];
@@ -129,6 +160,7 @@ export default function PlaygroundPage() {
               events: lastEvents ?? undefined,
               cost: opts.cost,
               tokens: opts.tokens,
+              attachments: atts.length ? atts : last.attachments,
             };
           }
           return next;
@@ -159,11 +191,13 @@ export default function PlaygroundPage() {
       },
     });
 
+    const body = buildMessageBody(text, userAttachments);
+
     try {
       const res = await fetch(streamUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: body }),
       });
 
       if (!res.ok) {
@@ -192,7 +226,7 @@ export default function PlaygroundPage() {
     } finally {
       setSending(false);
     }
-  }, [input, config, sending, streamUrl, refreshBudget, updateFromStream, showTrace]);
+  }, [input, attachments, config, sending, streamUrl, buildMessageBody, refreshBudget, updateFromStream, showTrace]);
 
   const closeTraceSidebar = useCallback(() => setTraceSidebar(null), []);
   const [agentModalOpen, setAgentModalOpen] = useState(false);
@@ -292,7 +326,9 @@ export default function PlaygroundPage() {
             onChange={setInput}
             onSend={sendMessage}
             disabled={sending}
-            placeholder="Type a message…"
+            placeholder="Type a message or paste/attach an image…"
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
           />
         </div>
       </main>

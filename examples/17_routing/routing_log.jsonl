@@ -4,3 +4,5 @@
 {"model": "almock/default", "task_type": "code", "reason": "Model specializes in code tasks", "selected_model": "code"}
 {"model": "almock/default", "task_type": "general", "reason": "Model specializes in general tasks", "selected_model": "general"}
 {"model": "almock/default", "task_type": "code", "reason": "Model specializes in code tasks", "selected_model": "code"}
+{"model": "almock/default", "task_type": "general", "reason": "Model specializes in general tasks", "selected_model": "general"}
+{"model": "almock/default", "task_type": "code", "reason": "Model specializes in code tasks", "selected_model": "code"}

@@ -20,7 +20,7 @@ try:
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
-    Redis = None  # type: ignore[misc,assignment]
+    Redis = None
 
 from syrin.memory.config import MemoryEntry
 

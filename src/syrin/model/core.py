@@ -20,7 +20,9 @@ from syrin.types import (
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator
 
+    from syrin.enums import Media
     from syrin.providers.base import Provider
+    from syrin.router.enums import TaskType
 else:
     from collections.abc import Iterator  # Runtime for cast()
 
@@ -224,6 +226,12 @@ class Model:
         input_price: float | None = None,
         output_price: float | None = None,
         fallback: list[Model] | None = None,
+        strengths: list[TaskType] | None = None,
+        input_media: set[Media] | None = None,
+        output_media: set[Media] | None = None,
+        priority: int = 100,
+        supports_tools: bool = True,
+        profile_name: str | None = None,
         **kwargs: Any,
     ) -> Model:
         """Create an OpenAI model.
@@ -261,6 +269,12 @@ class Model:
             input_price=input_price,
             output_price=output_price,
             fallback=fallback,
+            strengths=strengths,
+            input_media=input_media,
+            output_media=output_media,
+            priority=priority,
+            supports_tools=supports_tools,
+            profile_name=profile_name,
             **kwargs,
         )
 
@@ -281,6 +295,12 @@ class Model:
         input_price: float | None = None,
         output_price: float | None = None,
         fallback: list[Model] | None = None,
+        strengths: list[TaskType] | None = None,
+        input_media: set[Media] | None = None,
+        output_media: set[Media] | None = None,
+        priority: int = 100,
+        supports_tools: bool = True,
+        profile_name: str | None = None,
         **kwargs: Any,
     ) -> Model:
         """Create an Anthropic Claude model.
@@ -313,6 +333,12 @@ class Model:
             input_price=input_price,
             output_price=output_price,
             fallback=fallback,
+            strengths=strengths,
+            input_media=input_media,
+            output_media=output_media,
+            priority=priority,
+            supports_tools=supports_tools,
+            profile_name=profile_name,
             **kwargs,
         )
 
@@ -333,6 +359,12 @@ class Model:
         input_price: float | None = None,
         output_price: float | None = None,
         fallback: list[Model] | None = None,
+        strengths: list[TaskType] | None = None,
+        input_media: set[Media] | None = None,
+        output_media: set[Media] | None = None,
+        priority: int = 100,
+        supports_tools: bool = True,
+        profile_name: str | None = None,
         **kwargs: Any,
     ) -> Model:
         """Create an Ollama (local) model. No API key needed.
@@ -363,6 +395,12 @@ class Model:
             input_price=input_price,
             output_price=output_price,
             fallback=fallback,
+            strengths=strengths,
+            input_media=input_media,
+            output_media=output_media,
+            priority=priority,
+            supports_tools=supports_tools,
+            profile_name=profile_name,
             **kwargs,
         )
 
@@ -383,6 +421,12 @@ class Model:
         input_price: float | None = None,
         output_price: float | None = None,
         fallback: list[Model] | None = None,
+        strengths: list[TaskType] | None = None,
+        input_media: set[Media] | None = None,
+        output_media: set[Media] | None = None,
+        priority: int = 100,
+        supports_tools: bool = True,
+        profile_name: str | None = None,
         **kwargs: Any,
     ) -> Model:
         """Create a Google Gemini model.
@@ -416,6 +460,12 @@ class Model:
             input_price=input_price,
             output_price=output_price,
             fallback=fallback,
+            strengths=strengths,
+            input_media=input_media,
+            output_media=output_media,
+            priority=priority,
+            supports_tools=supports_tools,
+            profile_name=profile_name,
             **kwargs,
         )
 
@@ -435,6 +485,12 @@ class Model:
         input_price: float | None = None,
         output_price: float | None = None,
         fallback: list[Model] | None = None,
+        strengths: list[TaskType] | None = None,
+        input_media: set[Media] | None = None,
+        output_media: set[Media] | None = None,
+        priority: int = 100,
+        supports_tools: bool = True,
+        profile_name: str | None = None,
         **kwargs: Any,
     ) -> Model:
         """Create an OpenRouter model. Single API, multiple providers.
@@ -469,6 +525,12 @@ class Model:
             input_price=input_price,
             output_price=output_price,
             fallback=fallback,
+            strengths=strengths,
+            input_media=input_media,
+            output_media=output_media,
+            priority=priority,
+            supports_tools=supports_tools,
+            profile_name=profile_name,
             **kwargs,
         )
 
@@ -489,6 +551,12 @@ class Model:
         input_price: float | None = None,
         output_price: float | None = None,
         fallback: list[Model] | None = None,
+        strengths: list[TaskType] | None = None,
+        input_media: set[Media] | None = None,
+        output_media: set[Media] | None = None,
+        priority: int = 100,
+        supports_tools: bool = True,
+        profile_name: str | None = None,
         **kwargs: Any,
     ) -> Model:
         """Create a LiteLLM model. Supports 100+ providers via unified interface.
@@ -521,6 +589,12 @@ class Model:
             input_price=input_price,
             output_price=output_price,
             fallback=fallback,
+            strengths=strengths,
+            input_media=input_media,
+            output_media=output_media,
+            priority=priority,
+            supports_tools=supports_tools,
+            profile_name=profile_name,
             **kwargs,
         )
 
@@ -543,6 +617,12 @@ class Model:
         input_price: float | None = None,
         output_price: float | None = None,
         fallback: list[Model] | None = None,
+        strengths: list[TaskType] | None = None,
+        input_media: set[Media] | None = None,
+        output_media: set[Media] | None = None,
+        priority: int = 100,
+        supports_tools: bool = True,
+        profile_name: str | None = None,
         **kwargs: Any,
     ) -> Model:
         """Create a model for any OpenAI-compatible or custom API endpoint.
@@ -593,6 +673,12 @@ class Model:
             input_price=input_price,
             output_price=output_price,
             fallback=fallback,
+            strengths=strengths,
+            input_media=input_media,
+            output_media=output_media,
+            priority=priority,
+            supports_tools=supports_tools,
+            profile_name=profile_name,
             **kwargs,
         )
 
@@ -607,6 +693,12 @@ class Model:
         latency_min: float = 1.0,
         latency_max: float = 3.0,
         latency_seconds: float | None = None,
+        strengths: list[TaskType] | None = None,
+        input_media: set[Media] | None = None,
+        output_media: set[Media] | None = None,
+        priority: int = 100,
+        supports_tools: bool = True,
+        profile_name: str | None = None,
         **kwargs: Any,
     ) -> Model:
         """Create an Almock (An LLM Mock) model — no API calls, for testing and development.
@@ -655,6 +747,12 @@ class Model:
             response_mode=response_mode,
             custom_response=custom_response,
             lorem_length=lorem_length,
+            strengths=strengths,
+            input_media=input_media,
+            output_media=output_media,
+            priority=priority,
+            supports_tools=supports_tools,
+            profile_name=profile_name,
             **kwargs,
         )
 
@@ -682,6 +780,12 @@ class Model:
         input_price: float | None = None,
         output_price: float | None = None,
         transformer: Middleware | None = None,
+        strengths: list[TaskType] | None = None,
+        input_media: set[Media] | None = None,
+        output_media: set[Media] | None = None,
+        priority: int = 100,
+        supports_tools: bool = True,
+        profile_name: str | None = None,
         **provider_kwargs: Any,
     ) -> None:
         # Check if this is a subclass (for custom LLM providers)
@@ -730,6 +834,14 @@ class Model:
         self._output_type = output
         self._transformer = transformer
         self._fallback: list[Model] = list(fallback) if fallback else []
+        self._strengths = list(strengths) if strengths is not None else None
+        self._input_media = set(input_media) if input_media is not None else None
+        self._output_media = set(output_media) if output_media is not None else None
+        self._priority = priority
+        self._supports_tools = supports_tools
+        self._profile_name = (
+            profile_name.strip() if isinstance(profile_name, str) and profile_name else None
+        )
 
         self._settings = ModelSettings(
             context_window=context_window,
@@ -905,6 +1017,36 @@ class Model:
         """
         return self._api_key
 
+    @property
+    def strengths(self) -> list[TaskType] | None:
+        """Task types this model is good at. None = auto-inferred by router."""
+        return self._strengths
+
+    @property
+    def input_media(self) -> set[Media] | None:
+        """Input media supported (TEXT, IMAGE, etc.). None = auto-inferred by router."""
+        return self._input_media
+
+    @property
+    def output_media(self) -> set[Media] | None:
+        """Output media supported. None = defaults to {Media.TEXT} in router."""
+        return self._output_media
+
+    @property
+    def priority(self) -> int:
+        """Routing priority. Higher = preferred when routing (default 100)."""
+        return self._priority
+
+    @property
+    def supports_tools(self) -> bool:
+        """Whether this model supports tool/function calling (default True)."""
+        return self._supports_tools
+
+    @property
+    def profile_name(self) -> str | None:
+        """Routing profile display name. None = use model name."""
+        return self._profile_name
+
     def to_config(self) -> ModelConfig:
         """Convert to ModelConfig for provider use. Called internally; rarely needed by users."""
         return ModelConfig(
@@ -960,6 +1102,12 @@ class Model:
             else self._settings.default_reserve_tokens,
             pricing=self._pricing,
             transformer=self._transformer,
+            strengths=self._strengths,
+            input_media=self._input_media,
+            output_media=self._output_media,
+            priority=self._priority,
+            supports_tools=self._supports_tools,
+            profile_name=self._profile_name,
             _internal=True,
             **self._provider_kwargs,
             **kwargs,
@@ -994,6 +1142,54 @@ class Model:
             context_window=self._settings.context_window,
             pricing=self._pricing,
             transformer=self._transformer,
+            strengths=self._strengths,
+            input_media=self._input_media,
+            output_media=self._output_media,
+            priority=self._priority,
+            supports_tools=self._supports_tools,
+            profile_name=self._profile_name,
+            _internal=True,
+            **self._provider_kwargs,
+        )
+
+    def with_routing(
+        self,
+        *,
+        strengths: list[TaskType] | None = None,
+        input_media: set[Media] | None = None,
+        output_media: set[Media] | None = None,
+        priority: int | None = None,
+        supports_tools: bool | None = None,
+        profile_name: str | None = None,
+    ) -> Model:
+        """Return a copy with routing fields overridden. Use to add routing to existing models.
+
+        Example:
+            model = gpt4_mini.with_routing(strengths=[TaskType.CODE], profile_name="code")
+        """
+        return Model(
+            model_id=self._model_id,
+            name=self._name,
+            description=self._description,
+            version=self._version,
+            fallback=self._fallback.copy() if self._fallback else None,
+            output=self._output_type,
+            temperature=self._settings.temperature,
+            max_tokens=self._settings.max_output_tokens,
+            top_p=self._settings.top_p,
+            top_k=self._settings.top_k,
+            stop=self._settings.stop,
+            api_key=self._api_key,
+            api_base=self._api_base,
+            context_window=self._settings.context_window,
+            pricing=self._pricing,
+            transformer=self._transformer,
+            strengths=strengths if strengths is not None else self._strengths,
+            input_media=input_media if input_media is not None else self._input_media,
+            output_media=output_media if output_media is not None else self._output_media,
+            priority=priority if priority is not None else self._priority,
+            supports_tools=supports_tools if supports_tools is not None else self._supports_tools,
+            profile_name=profile_name if profile_name is not None else self._profile_name,
             _internal=True,
             **self._provider_kwargs,
         )
@@ -1038,6 +1234,12 @@ class Model:
             context_window=self._settings.context_window,
             pricing=self._pricing,
             transformer=middleware,
+            strengths=self._strengths,
+            input_media=self._input_media,
+            output_media=self._output_media,
+            priority=self._priority,
+            supports_tools=self._supports_tools,
+            profile_name=self._profile_name,
             _internal=True,
             **self._provider_kwargs,
         )

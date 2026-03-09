@@ -174,6 +174,30 @@ class HandoffRetryRequested(SyrinError):
         self.format_hint = format_hint or message
 
 
+class ModalityNotSupportedError(SyrinError):
+    """Raised when Agent declares input/output modalities that no router profile supports.
+
+    Use at construction time when input_modalities or output_modalities are provided
+    and the router profiles do not cover them.
+
+    Attributes:
+        message: Human-readable error.
+        required: Modalities that were required.
+        supported: Modalities the router profiles actually support.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        required: set[str] | None = None,
+        supported: set[str] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.required = required or set()
+        self.supported = supported or set()
+
+
 class NoMatchingProfileError(SyrinError):
     """Raised when no router profile matches the required task type and modality.
 

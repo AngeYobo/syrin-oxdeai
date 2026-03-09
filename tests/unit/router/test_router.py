@@ -6,10 +6,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from syrin.enums import Media
 from syrin.model import Model
-from syrin.router import ComplexityTier, Modality, RoutingMode, TaskType
+from syrin.router import ComplexityTier, RoutingMode, TaskType
 from syrin.router.classifier import ClassificationResult, PromptClassifier
-from syrin.router.profile import ModelProfile
 from syrin.router.router import ModelRouter, RoutingReason
 
 
@@ -17,25 +17,22 @@ def _almock(name: str = "test") -> Model:
     return Model.Almock(context_window=4096, latency_min=0, latency_max=0)
 
 
-def _profiles() -> list[ModelProfile]:
+def _models() -> list[Model]:
     return [
-        ModelProfile(
-            model=_almock("code"),
-            name="code-model",
+        _almock("code").with_routing(
+            profile_name="code-model",
             strengths=[TaskType.CODE, TaskType.REASONING],
             priority=100,
         ),
-        ModelProfile(
-            model=_almock("general"),
-            name="general-model",
+        _almock("general").with_routing(
+            profile_name="general-model",
             strengths=[TaskType.GENERAL, TaskType.CREATIVE],
             priority=90,
         ),
-        ModelProfile(
-            model=_almock("vision"),
-            name="vision-model",
+        _almock("vision").with_routing(
+            profile_name="vision-model",
             strengths=[TaskType.VISION],
-            modality_input={Modality.TEXT, Modality.IMAGE},
+            input_media={Media.TEXT, Media.IMAGE},
             priority=80,
         ),
     ]
@@ -121,27 +118,22 @@ class TestRoutingReason:
 class TestModelRouterValidation:
     """ModelRouter construction validation."""
 
-    def test_empty_profiles_without_force_model_raises(self) -> None:
-        with pytest.raises(ValueError, match="at least one profile"):
-            ModelRouter(profiles=[])
+    def test_empty_models_without_force_model_raises(self) -> None:
+        with pytest.raises(ValueError, match="at least one model"):
+            ModelRouter(models=[])
 
-    def test_empty_profiles_with_force_model_ok(self) -> None:
-        router = ModelRouter(profiles=[], force_model=_almock())
+    def test_empty_models_with_force_model_ok(self) -> None:
+        router = ModelRouter(models=[], force_model=_almock())
         model, task, reason = router.route("hello")
         assert model is not None
         assert reason.reason == "Routing bypassed via force_model"
-
-    def test_default_profile_not_in_names_raises(self) -> None:
-        profiles = _profiles()
-        with pytest.raises(ValueError, match="default_profile.*not in profile names"):
-            ModelRouter(profiles=profiles, default_profile="unknown")
 
 
 class TestModelRouterForceModel:
     """Force model bypass."""
 
     def test_force_model_bypasses_routing(self) -> None:
-        router = ModelRouter(profiles=_profiles(), force_model=_almock("forced"))
+        router = ModelRouter(models=_models(), force_model=_almock("forced"))
         model, task, reason = router.route("write code")
         assert reason.selected_model == "force_model"
         assert reason.reason == "Routing bypassed via force_model"
@@ -151,7 +143,7 @@ class TestModelRouterRouting:
     """Routing logic. Use task_override to avoid classifier dependency in unit tests."""
 
     def test_route_returns_model_task_reason(self) -> None:
-        router = ModelRouter(profiles=_profiles())
+        router = ModelRouter(models=_models())
         model, task, reason = router.route("write a function", task_override=TaskType.CODE)
         assert model is not None
         assert task == TaskType.CODE
@@ -159,23 +151,23 @@ class TestModelRouterRouting:
         assert reason.classification_confidence == 1.0
 
     def test_task_override_skips_classification(self) -> None:
-        router = ModelRouter(profiles=_profiles())
+        router = ModelRouter(models=_models())
         model, task, reason = router.route("hi", task_override=TaskType.CODE)
         assert task == TaskType.CODE
         assert reason.selected_model == "code-model"
 
     def test_cost_first_mode_selects_cheapest(self) -> None:
-        profiles = _profiles()
+        models = _models()
         router = ModelRouter(
-            profiles=profiles,
+            models=models,
             routing_mode=RoutingMode.COST_FIRST,
         )
         model, task, reason = router.route("hello", task_override=TaskType.GENERAL)
-        assert reason.selected_model in [p.name for p in profiles]
+        assert reason.selected_model in [p.profile_name or p.name for p in models]
 
     def test_quality_first_mode_selects_highest_priority(self) -> None:
         router = ModelRouter(
-            profiles=_profiles(),
+            models=_models(),
             routing_mode=RoutingMode.QUALITY_FIRST,
         )
         model, task, reason = router.route("hello", task_override=TaskType.GENERAL)
@@ -184,14 +176,8 @@ class TestModelRouterRouting:
     def test_no_matching_profile_raises(self) -> None:
         from syrin.exceptions import NoMatchingProfileError
 
-        profiles = [
-            ModelProfile(
-                model=_almock(),
-                name="code-only",
-                strengths=[TaskType.CODE],
-            ),
-        ]
-        router = ModelRouter(profiles=profiles)
+        models = [_almock().with_routing(profile_name="code-only", strengths=[TaskType.CODE])]
+        router = ModelRouter(models=models)
         with pytest.raises(NoMatchingProfileError, match="No profile supports"):
             router.route("describe this image", task_override=TaskType.VISION)
 
@@ -200,11 +186,32 @@ class TestModelRouterRouting:
             return "code-model" if "code-model" in names else None
 
         router = ModelRouter(
-            profiles=_profiles(),
+            models=_models(),
             routing_rule_callback=pick_code,
         )
         model, task, reason = router.route("write code", task_override=TaskType.CODE)
         assert reason.selected_model == "code-model"
+
+    def test_manual_mode_requires_task_override(self) -> None:
+        router = ModelRouter(
+            models=_models(),
+            routing_mode=RoutingMode.MANUAL,
+        )
+        with pytest.raises(ValueError, match="RoutingMode.MANUAL requires task_override"):
+            router.route("hello")
+        model, task, reason = router.route("hello", task_override=TaskType.GENERAL)
+        assert task == TaskType.GENERAL
+
+    def test_manual_mode_route_ordered_requires_task_override(self) -> None:
+        router = ModelRouter(
+            models=_models(),
+            routing_mode=RoutingMode.MANUAL,
+        )
+        with pytest.raises(ValueError, match="RoutingMode.MANUAL requires task_override"):
+            router.route_ordered("hello")
+        results = router.route_ordered("hello", task_override=TaskType.GENERAL)
+        assert len(results) > 0
+        assert results[0][1] == TaskType.GENERAL
 
 
 class TestModelRouterComplexityAndAlignment:
@@ -237,21 +244,15 @@ class TestModelRouterComplexityAndAlignment:
             complexity_tier=ComplexityTier.HIGH,
             system_alignment=0.4,
         )
-        profiles = [
-            ModelProfile(
-                model=_almock("premium"),
-                name="premium",
-                strengths=[TaskType.CODE, TaskType.REASONING],
-                priority=100,
+        models = [
+            _almock("premium").with_routing(
+                profile_name="premium", strengths=[TaskType.CODE, TaskType.REASONING], priority=100
             ),
-            ModelProfile(
-                model=_almock("cheap"),
-                name="cheap",
-                strengths=[TaskType.REASONING],
-                priority=80,
+            _almock("cheap").with_routing(
+                profile_name="cheap", strengths=[TaskType.REASONING], priority=80
             ),
         ]
-        router = ModelRouter(profiles=profiles, classifier=mock_cls)
+        router = ModelRouter(models=models, classifier=mock_cls)
         model, task, reason = router.route("solve this", messages=[])
         mock_cls.classify_extended.assert_called_once()
         assert reason.task_type == TaskType.REASONING
@@ -264,21 +265,15 @@ class TestModelRouterComplexityAndAlignment:
             task=TaskType.GENERAL,
             complexity_tier=ComplexityTier.HIGH,
         )
-        profiles = [
-            ModelProfile(
-                model=_almock("low"),
-                name="low",
-                strengths=[TaskType.GENERAL],
-                priority=70,
+        models = [
+            _almock("low").with_routing(
+                profile_name="low", strengths=[TaskType.GENERAL], priority=70
             ),
-            ModelProfile(
-                model=_almock("high"),
-                name="high",
-                strengths=[TaskType.GENERAL],
-                priority=100,
+            _almock("high").with_routing(
+                profile_name="high", strengths=[TaskType.GENERAL], priority=100
             ),
         ]
-        router = ModelRouter(profiles=profiles, classifier=mock_cls)
+        router = ModelRouter(models=models, classifier=mock_cls)
         model, task, reason = router.route("complex question", messages=[])
         assert reason.reason == "Complexity HIGH; selected highest-priority (high)"
         assert reason.selected_model == "high"
@@ -291,7 +286,7 @@ class TestModelRouterComplexityAndAlignment:
             Message(role="system", content="You are a coding assistant."),
             Message(role="user", content="Write a function"),
         ]
-        router = ModelRouter(profiles=_profiles(), classifier=mock_cls)
+        router = ModelRouter(models=_models(), classifier=mock_cls)
         router.route("Write a function", messages=messages)
         call_args = mock_cls.classify_extended.call_args
         assert call_args[0][0] == "Write a function"
@@ -326,15 +321,12 @@ class TestModelRouterEdgeCases:
     def test_classifier_raises_uses_fallback(self) -> None:
         mock_cls = self._make_mock_classifier()
         mock_cls.classify_extended.side_effect = RuntimeError("Model unavailable")
-        profiles = [
-            ModelProfile(
-                model=_almock("general"),
-                name="general",
-                strengths=[TaskType.GENERAL],
-                priority=90,
-            ),
+        models = [
+            _almock("general").with_routing(
+                profile_name="general", strengths=[TaskType.GENERAL], priority=90
+            )
         ]
-        router = ModelRouter(profiles=profiles, classifier=mock_cls)
+        router = ModelRouter(models=models, classifier=mock_cls)
         model, task, reason = router.route("write code", messages=[])
         assert task == TaskType.GENERAL
         assert reason.classification_confidence == 0.0
@@ -345,7 +337,7 @@ class TestModelRouterEdgeCases:
         mock_cls.low_confidence_fallback = TaskType.GENERAL
         del mock_cls.classify_extended
 
-        router = ModelRouter(profiles=_profiles(), classifier=mock_cls)
+        router = ModelRouter(models=_models(), classifier=mock_cls)
         model, task, reason = router.route("write a function", messages=[])
         mock_cls.classify.assert_called_once_with("write a function")
         assert task == TaskType.CODE
@@ -357,22 +349,16 @@ class TestModelRouterEdgeCases:
             task=TaskType.GENERAL,
             complexity_tier=ComplexityTier.LOW,
         )
-        profiles = [
-            ModelProfile(
-                model=_almock("cheap"),
-                name="cheap",
-                strengths=[TaskType.GENERAL],
-                priority=70,
+        models = [
+            _almock("cheap").with_routing(
+                profile_name="cheap", strengths=[TaskType.GENERAL], priority=70
             ),
-            ModelProfile(
-                model=_almock("expensive"),
-                name="expensive",
-                strengths=[TaskType.GENERAL],
-                priority=100,
+            _almock("expensive").with_routing(
+                profile_name="expensive", strengths=[TaskType.GENERAL], priority=100
             ),
         ]
         router = ModelRouter(
-            profiles=profiles,
+            models=models,
             classifier=mock_cls,
             routing_mode=RoutingMode.COST_FIRST,
         )
@@ -384,41 +370,35 @@ class TestModelRouterEdgeCases:
 
         mock_cls = self._make_mock_classifier()
         messages = [Message(role="user", content="hello")]
-        router = ModelRouter(profiles=_profiles(), classifier=mock_cls)
+        router = ModelRouter(models=_models(), classifier=mock_cls)
         router.route("hello", messages=messages)
         call_args = mock_cls.classify_extended.call_args
         assert call_args[0][1] is None
 
 
 class TestModelRouterBudgetParams:
-    """Budget params (budget_optimisation, economy_at, cheapest_at) affect routing."""
+    """Budget params (budget_optimisation, prefer_cheaper, force_cheapest) affect routing."""
 
     def test_budget_low_prefers_cheaper_model(self) -> None:
         from syrin.budget import Budget
 
         budget = Budget(run=1.0)
-        budget._set_spent(0.85)  # remaining=0.15, ratio=0.15 < economy_at=0.20
+        budget._set_spent(0.85)  # remaining=0.15, ratio=0.15 < prefer_cheaper=0.20
 
-        profiles = [
-            ModelProfile(
-                model=_almock("cheap"),
-                name="cheap",
-                strengths=[TaskType.GENERAL],
-                priority=70,
+        models = [
+            _almock("cheap").with_routing(
+                profile_name="cheap", strengths=[TaskType.GENERAL], priority=70
             ),
-            ModelProfile(
-                model=_almock("expensive"),
-                name="expensive",
-                strengths=[TaskType.GENERAL],
-                priority=100,
+            _almock("expensive").with_routing(
+                profile_name="expensive", strengths=[TaskType.GENERAL], priority=100
             ),
         ]
         router = ModelRouter(
-            profiles=profiles,
+            models=models,
             budget=budget,
             budget_optimisation=True,
-            economy_at=0.20,
-            cheapest_at=0.10,
+            prefer_cheaper_below_budget_ratio=0.20,
+            force_cheapest_below_budget_ratio=0.10,
             routing_mode=RoutingMode.AUTO,
         )
         model, task, reason = router.route("hello", messages=[])
@@ -429,28 +409,22 @@ class TestModelRouterBudgetParams:
         from syrin.budget import Budget
 
         budget = Budget(run=1.0)
-        budget._set_spent(0.92)  # remaining=0.08, ratio=0.08 < cheapest_at=0.10
+        budget._set_spent(0.92)  # remaining=0.08, ratio=0.08 < force_cheapest=0.10
 
-        profiles = [
-            ModelProfile(
-                model=_almock("cheap"),
-                name="cheap",
-                strengths=[TaskType.GENERAL],
-                priority=70,
+        models = [
+            _almock("cheap").with_routing(
+                profile_name="cheap", strengths=[TaskType.GENERAL], priority=70
             ),
-            ModelProfile(
-                model=_almock("expensive"),
-                name="expensive",
-                strengths=[TaskType.GENERAL],
-                priority=100,
+            _almock("expensive").with_routing(
+                profile_name="expensive", strengths=[TaskType.GENERAL], priority=100
             ),
         ]
         router = ModelRouter(
-            profiles=profiles,
+            models=models,
             budget=budget,
             budget_optimisation=True,
-            economy_at=0.20,
-            cheapest_at=0.10,
+            prefer_cheaper_below_budget_ratio=0.20,
+            force_cheapest_below_budget_ratio=0.10,
             routing_mode=RoutingMode.AUTO,
         )
         model, task, reason = router.route("hello", messages=[])
@@ -463,22 +437,16 @@ class TestModelRouterBudgetParams:
         budget = Budget(run=1.0)
         budget._set_spent(0.90)  # Low remaining
 
-        profiles = [
-            ModelProfile(
-                model=_almock("cheap"),
-                name="cheap",
-                strengths=[TaskType.GENERAL],
-                priority=70,
+        models = [
+            _almock("cheap").with_routing(
+                profile_name="cheap", strengths=[TaskType.GENERAL], priority=70
             ),
-            ModelProfile(
-                model=_almock("expensive"),
-                name="expensive",
-                strengths=[TaskType.GENERAL],
-                priority=100,
+            _almock("expensive").with_routing(
+                profile_name="expensive", strengths=[TaskType.GENERAL], priority=100
             ),
         ]
         router = ModelRouter(
-            profiles=profiles,
+            models=models,
             budget=budget,
             budget_optimisation=False,
             routing_mode=RoutingMode.AUTO,
@@ -488,10 +456,120 @@ class TestModelRouterBudgetParams:
         assert "budget" not in reason.reason.lower()
 
 
+class TestModelRouterRouteOrdered:
+    """route_ordered returns ranked list for fallback."""
+
+    def test_route_ordered_returns_list(self) -> None:
+        router = ModelRouter(models=_models())
+        results = router.route_ordered("hello", task_override=TaskType.GENERAL)
+        assert len(results) >= 1
+        model, task, reason = results[0]
+        assert model is not None
+        assert task == TaskType.GENERAL
+        assert reason.selected_model in [p.profile_name or p.name for p in _models()]
+
+    def test_route_ordered_max_alternatives(self) -> None:
+        router = ModelRouter(models=_models())
+        results = router.route_ordered("hello", task_override=TaskType.GENERAL, max_alternatives=2)
+        assert len(results) <= 2
+
+    def test_route_ordered_force_model_returns_single(self) -> None:
+        router = ModelRouter(models=_models(), force_model=_almock("f"))
+        results = router.route_ordered("x")
+        assert len(results) == 1
+        assert results[0][2].selected_model == "force_model"
+
+
 class TestModelRouterSelectModel:
     """select_model convenience method."""
 
     def test_select_model_returns_model(self) -> None:
-        router = ModelRouter(profiles=_profiles())
+        router = ModelRouter(models=_models())
         model = router.select_model("hello", context={"input_tokens_estimate": 100})
         assert model is not None
+
+
+class TestModelRouterPricingCache:
+    """Pricing is cached at init; get_pricing not called on every route."""
+
+    def test_pricing_cached_at_init_not_on_route(self) -> None:
+        from unittest.mock import patch
+
+        from syrin.cost import ModelPricing
+
+        m = _almock("cached").with_routing(profile_name="cached", strengths=[TaskType.GENERAL])
+        pricing = ModelPricing(input_per_1m=1.0, output_per_1m=2.0)
+        with patch.object(m, "get_pricing", return_value=pricing) as get_pricing:
+            router = ModelRouter(models=[m])
+            assert get_pricing.call_count == 1
+            for _ in range(5):
+                router.route("hello", task_override=TaskType.GENERAL)
+            assert get_pricing.call_count == 1
+
+    def test_cost_estimate_uses_cached_pricing(self) -> None:
+        from unittest.mock import patch
+
+        from syrin.cost import ModelPricing
+
+        m = _almock("priced").with_routing(profile_name="priced", strengths=[TaskType.GENERAL])
+        pricing = ModelPricing(input_per_1m=1.0, output_per_1m=2.0)
+        with patch.object(m, "get_pricing", return_value=pricing):
+            router = ModelRouter(models=[m])
+            _, _, reason = router.route(
+                "hello",
+                task_override=TaskType.GENERAL,
+                context={"input_tokens_estimate": 1000, "max_output_tokens": 500},
+            )
+            expected = (1000 / 1_000_000) * 1.0 + (500 / 1_000_000) * 2.0
+            assert abs(reason.cost_estimate - round(expected, 6)) < 0.0001
+
+    def test_profile_without_pricing_uses_zero_cost(self) -> None:
+        from unittest.mock import patch
+
+        m = _almock("no-pricing").with_routing(
+            profile_name="no-pricing", strengths=[TaskType.GENERAL]
+        )
+        with patch.object(m, "get_pricing", return_value=None):
+            router = ModelRouter(models=[m])
+            _, _, reason = router.route("hello", task_override=TaskType.GENERAL)
+            assert reason.cost_estimate == 0.0
+
+
+class TestModelRouterTokenEstimation:
+    """Token estimation uses universal chars/4, not model-specific tokenizer."""
+
+    def test_estimate_tokens_uses_chars_div_4(self) -> None:
+        """20 chars -> 5 tokens (20/4), 0 chars -> 1 (min)."""
+        router = ModelRouter(models=_models())
+        _, _, reason = router.route(
+            "x" * 20,
+            task_override=TaskType.GENERAL,
+            context={"input_tokens_estimate": None},
+        )
+        # Cost uses in_tok from _estimate_tokens; with 20 chars, in_tok=5 (20//4)
+        assert reason.cost_estimate >= 0
+
+    def test_context_input_tokens_estimate_overrides(self) -> None:
+        router = ModelRouter(models=_models())
+        _, _, reason = router.route(
+            "short",
+            task_override=TaskType.GENERAL,
+            context={"input_tokens_estimate": 5000, "max_output_tokens": 2000},
+        )
+        # Cost should reflect 5000 input, 2000 output
+        assert reason.cost_estimate >= 0
+
+    def test_empty_prompt_gets_min_one_token(self) -> None:
+        from unittest.mock import patch
+
+        from syrin.cost import ModelPricing
+
+        m = _almock("t").with_routing(profile_name="t", strengths=[TaskType.GENERAL])
+        pricing = ModelPricing(input_per_1m=1.0, output_per_1m=1.0)
+        with patch.object(m, "get_pricing", return_value=pricing):
+            router = ModelRouter(models=[m])
+            _, _, reason = router.route("", task_override=TaskType.GENERAL)
+            # Empty prompt -> 1 token (max(1, 0))
+            assert reason.cost_estimate == round(
+                (1 / 1_000_000) * 1.0 + (1024 / 1_000_000) * 1.0, 6
+            )

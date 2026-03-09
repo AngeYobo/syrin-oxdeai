@@ -108,7 +108,12 @@ class AlmockProvider(Provider):
             length = lorem_length if lorem_length > 0 else 100
             content = _lorem_ipsum(length)
 
-        input_tokens = sum(_estimate_tokens(m.content or "") for m in messages) or 1
+        def _to_str(c: str | list[dict[str, Any]] | None) -> str:
+            if c is None:
+                return ""
+            return c if isinstance(c, str) else str(c)
+
+        input_tokens = sum(_estimate_tokens(_to_str(m.content)) for m in messages) or 1
         output_tokens = _estimate_tokens(content) or 1
 
         return ProviderResponse(

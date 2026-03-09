@@ -19,8 +19,21 @@ from syrin.enums import FormationMode, MessageRole
 from syrin.types import Message
 
 
+def _user_input_to_search_str(user_input: str | list[dict[str, Any]]) -> str:
+    """Extract text from user_input for memory search. Str passthrough; list[dict] -> text parts."""
+    if isinstance(user_input, str):
+        return user_input
+    parts: list[str] = []
+    for part in user_input:
+        if isinstance(part, dict):
+            text = part.get("text") or part.get("content")
+            if isinstance(text, str):
+                parts.append(text)
+    return "\n".join(parts) if parts else ""
+
+
 def build_messages(
-    user_input: str,
+    user_input: str | list[dict[str, Any]],
     *,
     system_prompt: str,
     tools: list[Any],
@@ -41,7 +54,7 @@ def build_messages(
     the final list of Message objects.
 
     Args:
-        user_input: The user's message.
+        user_input: The user's message (str or list of content parts for multimodal).
         system_prompt: System prompt text.
         tools: List of ToolSpec or tool-like (with to_tool_spec or dict).
         conversation_memory: Unused (kept for API compatibility).
@@ -68,7 +81,7 @@ def build_messages(
             tracer,
             "memory.recall",
             {"memory.kind": "persistent"},
-            lambda: memory_backend.search(user_input, None, top_k),
+            lambda: memory_backend.search(_user_input_to_search_str(user_input), None, top_k),
             result_attr=("MEMORY_RESULTS_COUNT", len),
         )
         if memories:
@@ -107,7 +120,7 @@ def build_messages(
         top_k = getattr(effective_context, "pull_top_k", 10)
         threshold = getattr(effective_context, "pull_threshold", 0.0)
         pulled = persistent_memory.get_relevant_segments(
-            user_input, top_k=top_k, threshold=threshold
+            _user_input_to_search_str(user_input), top_k=top_k, threshold=threshold
         )
         for seg, score in pulled:
             messages.append(
@@ -141,7 +154,7 @@ def build_messages(
         top_k_oc = getattr(effective_context, "output_chunk_top_k", 5)
         threshold_oc = getattr(effective_context, "output_chunk_threshold", 0.0)
         oc_result = persistent_memory.get_relevant_output_chunks(
-            user_input, top_k=top_k_oc, threshold=threshold_oc
+            _user_input_to_search_str(user_input), top_k=top_k_oc, threshold=threshold_oc
         )
         for seg, score in oc_result:
             messages.append(

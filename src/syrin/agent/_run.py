@@ -9,13 +9,14 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from syrin.agent._context_builder import _user_input_to_search_str
 from syrin.enums import GuardrailStage, StopReason
 from syrin.loop import LoopResult
 from syrin.response import Response
 from syrin.types import TokenUsage
 
 
-async def run_agent_loop_async(agent: Any, user_input: str) -> Response[str]:
+async def run_agent_loop_async(agent: Any, user_input: str | list[dict[str, Any]]) -> Response[str]:
     """Run the configured loop with full observability and build Response.
 
     Performs: input guardrails → loop.run(ctx, user_input) → checkpoint →
@@ -23,19 +24,20 @@ async def run_agent_loop_async(agent: Any, user_input: str) -> Response[str]:
     """
     from syrin.observability import SemanticAttributes, SpanKind
 
+    input_str = _user_input_to_search_str(user_input)
     with agent._tracer.span(
         f"{agent._agent_name}.response",
         kind=SpanKind.AGENT,
         attributes={
             SemanticAttributes.AGENT_NAME: agent._agent_name,
             SemanticAttributes.AGENT_CLASS: agent.__class__.__name__,
-            "input": user_input if not agent._debug else user_input[:1000],
+            "input": input_str if not agent._debug else input_str[:1000],
             SemanticAttributes.LLM_MODEL: agent._model_config.model_id,
             SemanticAttributes.LLM_PROVIDER: agent._model_config.provider,
         },
     ) as agent_span:
-        # Input guardrails check
-        input_guardrail = agent._run_guardrails(user_input, GuardrailStage.INPUT)
+        # Input guardrails check (use text for guardrails)
+        input_guardrail = agent._run_guardrails(input_str, GuardrailStage.INPUT)
         if not input_guardrail.passed:
             return cast(
                 Response[str],
@@ -114,7 +116,9 @@ async def run_agent_loop_async(agent: Any, user_input: str) -> Response[str]:
         )
 
 
-def _auto_store_turn(agent: Any, user_input: str, assistant_content: str | None) -> None:
+def _auto_store_turn(
+    agent: Any, user_input: str | list[dict[str, Any]], assistant_content: str | None
+) -> None:
     """Store user input and assistant response as episodic memories when auto_store is enabled."""
     pm = getattr(agent, "_persistent_memory", None)
     if pm is None or not getattr(pm, "auto_store", False):
@@ -124,9 +128,10 @@ def _auto_store_turn(agent: Any, user_input: str, assistant_content: str | None)
     try:
         from syrin.enums import MemoryType
 
-        if user_input and user_input.strip():
+        text = _user_input_to_search_str(user_input)
+        if text and text.strip():
             agent.remember(
-                f"User said: {user_input.strip()}",
+                f"User said: {text.strip()}",
                 memory_type=MemoryType.EPISODIC,
                 importance=0.7,
             )
@@ -197,6 +202,7 @@ def _response_from_loop_result(
     tool_calls_list: list[Any],
     structured: Any,
 ) -> Response[str]:
+    from syrin.response import MediaAttachment
     from syrin.response import Response as ResponseClass
 
     stop_reason = (
@@ -208,8 +214,23 @@ def _response_from_loop_result(
     model_id = effective_config.model_id
     routing_reason = getattr(agent, "_last_routing_reason", None)
     task_type = routing_reason.task_type if routing_reason is not None else None
+    gen_media = getattr(result, "generated_media", None)
+    if not isinstance(gen_media, (list, tuple)):
+        gen_media = []
+    attachments = [
+        MediaAttachment(
+            type=m["type"],
+            content_type=m.get(
+                "content_type", "image/png" if m["type"] == "image" else "video/mp4"
+            ),
+            url=m.get("url"),
+        )
+        for m in gen_media
+        if isinstance(m, dict) and m.get("url")
+    ]
     return ResponseClass(
         content=result.content,
+        attachments=attachments,
         cost=result.cost_usd,
         tokens=tokens,
         model=model_id,

@@ -11,8 +11,10 @@ class TaskType(StrEnum):
     Attributes:
         CODE: Code generation, debugging, review, implementation.
         GENERAL: General conversation, Q&A, chitchat.
-        VISION: Image understanding, OCR, image description.
-        VIDEO: Video analysis, video generation.
+        VISION: Image understanding, OCR, image description (input).
+        IMAGE_GENERATION: Create, draw, or generate an image (output).
+        VIDEO: Video analysis, transcription (input).
+        VIDEO_GENERATION: Create or generate a video (output).
         PLANNING: Complex reasoning, task decomposition, strategy.
         REASONING: Math, logic, analytical reasoning.
         CREATIVE: Writing, brainstorming, creative content.
@@ -22,30 +24,13 @@ class TaskType(StrEnum):
     CODE = "code"
     GENERAL = "general"
     VISION = "vision"
+    IMAGE_GENERATION = "image_generation"
     VIDEO = "video"
+    VIDEO_GENERATION = "video_generation"
     PLANNING = "planning"
     REASONING = "reasoning"
     CREATIVE = "creative"
     TRANSLATION = "translation"
-
-
-class Modality(StrEnum):
-    """Generic enum for content and model capabilities. Use for message content detection
-    and model input/output capabilities (ModelProfile.modality_input, modality_output).
-
-    Attributes:
-        TEXT: Plain text.
-        IMAGE: Image input/output.
-        VIDEO: Video input/output.
-        AUDIO: Audio input/output.
-        FILE: Generic file attachment (for future extensibility).
-    """
-
-    TEXT = "text"
-    IMAGE = "image"
-    VIDEO = "video"
-    AUDIO = "audio"
-    FILE = "file"
 
 
 class ComplexityTier(StrEnum):

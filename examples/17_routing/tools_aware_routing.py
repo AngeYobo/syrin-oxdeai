@@ -8,7 +8,6 @@ from __future__ import annotations
 from syrin import Agent, tool
 from syrin.model import Model
 from syrin.router import (
-    ModelProfile,
     ModelRouter,
     RouterConfig,
     RoutingMode,
@@ -23,29 +22,28 @@ def get_weather(city: str) -> str:
 
 
 def main() -> None:
-    text_only = Model.Almock(latency_min=0, latency_max=0)
-    with_tools = Model.Almock(latency_min=0, latency_max=0)
+    text_only = Model.Almock(
+        latency_min=0,
+        latency_max=0,
+        profile_name="text-only",
+        strengths=[TaskType.GENERAL],
+        supports_tools=False,
+        priority=90,
+    )
+    with_tools = Model.Almock(
+        latency_min=0,
+        latency_max=0,
+        profile_name="with-tools",
+        strengths=[TaskType.GENERAL],
+        supports_tools=True,
+        priority=80,
+    )
 
-    profiles = [
-        ModelProfile(
-            model=text_only,
-            name="text-only",
-            strengths=[TaskType.GENERAL],
-            supports_tools=False,
-            priority=90,
-        ),
-        ModelProfile(
-            model=with_tools,
-            name="with-tools",
-            strengths=[TaskType.GENERAL],
-            supports_tools=True,
-            priority=80,
-        ),
-    ]
-    router = ModelRouter(profiles=profiles, routing_mode=RoutingMode.AUTO)
+    models_list = [text_only, with_tools]
+    router = ModelRouter(models=models_list, routing_mode=RoutingMode.AUTO)
 
     agent = Agent(
-        model=[text_only, with_tools],
+        model=models_list,
         router_config=RouterConfig(router=router),
         system_prompt="You are helpful.",
         tools=[get_weather],

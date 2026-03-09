@@ -7,18 +7,18 @@ Model routing — task classification, model selection, and Agent integration.
 | Example | Features |
 |---------|----------|
 | **`prompt_classifier.py`** | PromptClassifier, embedding-based task detection |
-| **`model_router.py`** | ModelRouter, ModelProfile, task_override, RoutingMode |
+| **`model_router.py`** | ModelRouter, Model routing fields, task_override, RoutingMode |
 | **`agent_routing.py`** | Agent + model list, RouterConfig, task_type override, ROUTING_DECISION hook |
 | **`classifier_with_agent.py`** | PromptClassifier + Agent (auto task detection, no task_override) |
-| **`cost_first_budget_agent.py`** | COST_FIRST, economy_at, cheapest_at, budget_optimisation |
+| **`cost_first_budget_agent.py`** | COST_FIRST, prefer_cheaper/force_cheapest budget ratios, budget_optimisation |
 | **`quality_first.py`** | QUALITY_FIRST — always pick highest-priority capable model |
-| **`simple_model_list.py`** | Minimal: model list + RouterConfig, profiles_from_models |
+| **`simple_model_list.py`** | Minimal: model list + RouterConfig |
 | **`force_model_debug.py`** | force_model — bypass routing, always use specific model |
 | **`custom_routing_callback.py`** | routing_rule_callback — VIP prompts, A/B logic |
 | **`openrouter_single_key.py`** | OpenRouterBuilder — one API key, multiple providers |
-| **`default_profiles_agent.py`** | DEFAULT_PROFILES (claude-code, gpt-general, gemini-vision) |
+| **`default_profiles_agent.py`** | get_default_profiles() (claude-code, gpt-general, gemini-vision) |
 | **`tools_aware_routing.py`** | supports_tools — exclude text-only models when Agent has tools |
-| **`vision_modality_routing.py`** | Modality (TEXT, IMAGE), modality_input for vision models |
+| **`vision_modality_routing.py`** | Media (TEXT, IMAGE), input_media for vision models |
 | **`routing_observability.py`** | ROUTING_DECISION hook — log routing to file/metrics |
 | **`max_cost_cap.py`** | COST_FIRST, cost_estimate in RoutingReason |
 | **`production_classifier.py`** | classify_extended, complexity, system alignment |
@@ -52,7 +52,7 @@ python -m examples.17_routing.vision_modality_routing
 python -m examples.17_routing.routing_observability
 
 # Requires classifier-embeddings
-uv pip install syrin[classifier-embeddings]
+uv pip install 'syrin[classifier-embeddings]'
 python -m examples.17_routing.prompt_classifier
 python -m examples.17_routing.classifier_with_agent
 

@@ -11,7 +11,6 @@ from __future__ import annotations
 from syrin import Agent
 from syrin.model import Model
 from syrin.router import (
-    ModelProfile,
     ModelRouter,
     RouterConfig,
     RoutingMode,
@@ -31,31 +30,30 @@ def vip_routing_callback(
 
 
 def main() -> None:
-    standard = Model.Almock(latency_min=0, latency_max=0)
-    premium = Model.Almock(latency_min=0, latency_max=0)
+    standard = Model.Almock(
+        latency_min=0,
+        latency_max=0,
+        profile_name="standard",
+        strengths=[TaskType.GENERAL, TaskType.CODE],
+        priority=90,
+    )
+    premium = Model.Almock(
+        latency_min=0,
+        latency_max=0,
+        profile_name="premium",
+        strengths=[TaskType.GENERAL, TaskType.CODE, TaskType.REASONING],
+        priority=100,
+    )
 
-    profiles = [
-        ModelProfile(
-            model=standard,
-            name="standard",
-            strengths=[TaskType.GENERAL, TaskType.CODE],
-            priority=90,
-        ),
-        ModelProfile(
-            model=premium,
-            name="premium",
-            strengths=[TaskType.GENERAL, TaskType.CODE, TaskType.REASONING],
-            priority=100,
-        ),
-    ]
+    models_list = [standard, premium]
     router = ModelRouter(
-        profiles=profiles,
+        models=models_list,
         routing_mode=RoutingMode.AUTO,
         routing_rule_callback=vip_routing_callback,
     )
 
     agent = Agent(
-        model=[standard, premium],
+        model=models_list,
         router_config=RouterConfig(router=router),
         system_prompt="You are helpful.",
     )

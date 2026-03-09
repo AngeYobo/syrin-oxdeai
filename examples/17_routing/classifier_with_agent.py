@@ -1,6 +1,6 @@
 """PromptClassifier with Agent — embedding-based task detection, no task_override.
 
-Requires: uv pip install syrin[classifier-embeddings]
+Requires: uv pip install 'syrin[classifier-embeddings]'
 
 Uses PromptClassifier to auto-detect task type from prompt. No need to pass
 task_type in response() for production use.
@@ -11,7 +11,6 @@ from __future__ import annotations
 from syrin import Agent
 from syrin.model import Model
 from syrin.router import (
-    ModelProfile,
     ModelRouter,
     PromptClassifier,
     RouterConfig,
@@ -21,23 +20,22 @@ from syrin.router import (
 
 
 def main() -> None:
-    general_m = Model.Almock(latency_min=0, latency_max=0)
-    code_m = Model.Almock(latency_min=0, latency_max=0)
+    general_m = Model.Almock(
+        latency_min=0,
+        latency_max=0,
+        profile_name="general",
+        strengths=[TaskType.GENERAL, TaskType.CREATIVE],
+        priority=90,
+    )
+    code_m = Model.Almock(
+        latency_min=0,
+        latency_max=0,
+        profile_name="code",
+        strengths=[TaskType.CODE, TaskType.REASONING],
+        priority=100,
+    )
 
-    profiles = [
-        ModelProfile(
-            model=general_m,
-            name="general",
-            strengths=[TaskType.GENERAL, TaskType.CREATIVE],
-            priority=90,
-        ),
-        ModelProfile(
-            model=code_m,
-            name="code",
-            strengths=[TaskType.CODE, TaskType.REASONING],
-            priority=100,
-        ),
-    ]
+    models_list = [general_m, code_m]
     classifier = PromptClassifier(
         min_confidence=0.6,
         low_confidence_fallback=TaskType.GENERAL,
@@ -47,13 +45,13 @@ def main() -> None:
         },
     )
     router = ModelRouter(
-        profiles=profiles,
+        models=models_list,
         routing_mode=RoutingMode.AUTO,
         classifier=classifier,
     )
 
     agent = Agent(
-        model=[general_m, code_m],
+        model=models_list,
         router_config=RouterConfig(router=router),
         system_prompt="You are helpful.",
     )

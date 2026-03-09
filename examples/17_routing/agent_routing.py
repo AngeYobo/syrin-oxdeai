@@ -13,7 +13,6 @@ import sys
 from syrin import Agent, Budget, Hook
 from syrin.model import Model
 from syrin.router import (
-    ModelProfile,
     ModelRouter,
     RouterConfig,
     RoutingMode,
@@ -23,28 +22,29 @@ from syrin.router import (
 
 def main() -> None:
     # Almock models with distinct strengths for routing demo
-    general_m = Model.Almock(context_window=4096, latency_min=0, latency_max=0)
-    code_m = Model.Almock(context_window=8192, latency_min=0, latency_max=0)
+    general_m = Model.Almock(
+        context_window=4096,
+        latency_min=0,
+        latency_max=0,
+        profile_name="general",
+        strengths=[TaskType.GENERAL, TaskType.CREATIVE],
+        priority=90,
+    )
+    code_m = Model.Almock(
+        context_window=8192,
+        latency_min=0,
+        latency_max=0,
+        profile_name="code",
+        strengths=[TaskType.CODE, TaskType.REASONING],
+        priority=100,
+    )
 
-    profiles = [
-        ModelProfile(
-            model=general_m,
-            name="general",
-            strengths=[TaskType.GENERAL, TaskType.CREATIVE],
-            priority=90,
-        ),
-        ModelProfile(
-            model=code_m,
-            name="code",
-            strengths=[TaskType.CODE, TaskType.REASONING],
-            priority=100,
-        ),
-    ]
-    router = ModelRouter(profiles=profiles, routing_mode=RoutingMode.AUTO)
+    models_list = [general_m, code_m]
+    router = ModelRouter(models=models_list, routing_mode=RoutingMode.AUTO)
 
     use_trace = "--trace" in sys.argv
     agent = Agent(
-        model=[general_m, code_m],
+        model=models_list,
         router_config=RouterConfig(router=router),
         system_prompt="You are helpful.",
         budget=Budget(run=1.0),

@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 
 from syrin import Agent
+from syrin.enums import Media
 from syrin.model import Model
-from syrin.router import RouterConfig, RoutingMode, TaskType
-from syrin.router.agent_integration import build_router_from_models, profiles_from_models
-from syrin.router.profile import ModelProfile
+from syrin.router import RouterConfig, RoutingMode, TaskType, register_model_capabilities
+from syrin.router.agent_integration import _profiles_from_models, build_router_from_models
 
 
 def _almock(name: str = "test") -> Model:
@@ -16,28 +16,101 @@ def _almock(name: str = "test") -> Model:
 
 
 class TestProfilesFromModels:
-    """profiles_from_models helper."""
+    """_profiles_from_models internal helper."""
 
     def test_empty_list_returns_empty(self) -> None:
-        assert profiles_from_models([]) == []
+        assert _profiles_from_models([]) == []
 
     def test_single_model_creates_one_profile(self) -> None:
         m = _almock("a")
-        profiles = profiles_from_models([m])
+        profiles = _profiles_from_models([m])
         assert len(profiles) == 1
         assert profiles[0].model is m
         assert profiles[0].name in ("almock", "test")
         assert TaskType.GENERAL in profiles[0].strengths
 
     def test_multiple_models_creates_unique_names(self) -> None:
-        profiles = profiles_from_models([_almock(), _almock(), _almock()])
+        profiles = _profiles_from_models([_almock(), _almock(), _almock()])
         names = [p.name for p in profiles]
         assert len(set(names)) == 3
 
     def test_custom_strengths(self) -> None:
         m = _almock()
-        profiles = profiles_from_models([m], strengths=[TaskType.CODE, TaskType.REASONING])
+        profiles = _profiles_from_models([m], strengths=[TaskType.CODE, TaskType.REASONING])
         assert profiles[0].strengths == [TaskType.CODE, TaskType.REASONING]
+
+    def test_auto_detect_claude_strengths(self) -> None:
+        m = Model.Anthropic("claude-sonnet-4", api_key="sk-fake")
+        profiles = _profiles_from_models([m])
+        assert TaskType.CODE in profiles[0].strengths
+        assert TaskType.REASONING in profiles[0].strengths
+        assert TaskType.PLANNING in profiles[0].strengths
+
+    def test_auto_detect_gemini_vision_media(self) -> None:
+        m = Model.Google("gemini-2.0-flash", api_key="fake")
+        profiles = _profiles_from_models([m])
+        from syrin.enums import Media
+
+        assert Media.IMAGE in profiles[0].input_media
+        assert Media.VIDEO in profiles[0].input_media
+        assert TaskType.VISION in profiles[0].strengths
+
+    def test_auto_detect_gpt4o_vision(self) -> None:
+        m = Model.OpenAI("gpt-4o", api_key="sk-fake")
+        profiles = _profiles_from_models([m])
+        assert Media.IMAGE in profiles[0].input_media
+        assert TaskType.VISION in profiles[0].strengths
+
+    def test_model_strengths_override_inference(self) -> None:
+        m = Model.Almock(strengths=[TaskType.CODE, TaskType.REASONING])
+        profiles = _profiles_from_models([m])
+        assert profiles[0].strengths == [TaskType.CODE, TaskType.REASONING]
+
+    def test_model_input_media_override_inference(self) -> None:
+        m = Model.Almock(input_media={Media.TEXT, Media.IMAGE})
+        profiles = _profiles_from_models([m])
+        assert profiles[0].input_media == {Media.TEXT, Media.IMAGE}
+
+    def test_model_output_media_override_default(self) -> None:
+        m = Model.Almock(output_media={Media.TEXT, Media.IMAGE})
+        profiles = _profiles_from_models([m])
+        assert profiles[0].output_media == {Media.TEXT, Media.IMAGE}
+
+    def test_model_priority_and_supports_tools(self) -> None:
+        m = Model.Almock(priority=90, supports_tools=False)
+        profiles = _profiles_from_models([m])
+        assert profiles[0].priority == 90
+        assert profiles[0].supports_tools is False
+
+    def test_model_routing_fields_with_openai_constructor(self) -> None:
+        m = Model.OpenAI(
+            "gpt-4o-mini",
+            api_key="sk-fake",
+            strengths=[TaskType.TRANSLATION],
+            priority=80,
+        )
+        profiles = _profiles_from_models([m])
+        assert profiles[0].strengths == [TaskType.TRANSLATION]
+        assert profiles[0].priority == 80
+
+    def test_register_model_capabilities_overrides_builtin(self) -> None:
+        register_model_capabilities(
+            "xyztest-reg",
+            [TaskType.CODE, TaskType.REASONING],
+            input_media={Media.TEXT, Media.IMAGE},
+        )
+        try:
+            m = Model(provider="custom", model_id="xyztest-reg-v1")
+            profiles = _profiles_from_models([m])
+            assert TaskType.CODE in profiles[0].strengths
+            assert TaskType.REASONING in profiles[0].strengths
+            assert Media.IMAGE in profiles[0].input_media
+        finally:
+            from syrin.router.agent_integration import _USER_CAPABILITIES
+
+            _USER_CAPABILITIES[:] = [
+                (p, s, m) for p, s, m in _USER_CAPABILITIES if p != "xyztest-reg"
+            ]
 
 
 class TestBuildRouterFromModels:
@@ -100,23 +173,12 @@ class TestAgentTaskOverride:
     def test_task_override_passed_to_router(self) -> None:
         from syrin.router.router import ModelRouter
 
-        code_m = Model.Almock()
-        general_m = Model.Almock()
-        profiles = [
-            ModelProfile(
-                model=code_m,
-                name="code",
-                strengths=[TaskType.CODE],
-            ),
-            ModelProfile(
-                model=general_m,
-                name="general",
-                strengths=[TaskType.GENERAL],
-            ),
-        ]
-        router = ModelRouter(profiles=profiles)
+        code_m = Model.Almock(profile_name="code", strengths=[TaskType.CODE])
+        general_m = Model.Almock(profile_name="general", strengths=[TaskType.GENERAL])
+        models_list = [code_m, general_m]
+        router = ModelRouter(models=models_list)
         agent = Agent(
-            model=[code_m, general_m],
+            model=models_list,
             router_config=RouterConfig(router=router),
             system_prompt="Hi",
         )

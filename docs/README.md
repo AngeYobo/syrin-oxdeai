@@ -59,9 +59,14 @@ Learn by doing! Pick a use case that matches what you want to build:
 **[Models Guide](models.md)** - Complete guide to models
 
 **[Routing](routing.md)** - Task classification and model routing
-- PromptClassifier, ModelProfile, ModelRouter, RouterConfig
+- PromptClassifier, ModelRouter, RouterConfig
 - Agent with model list + router_config
-- OpenRouter, DEFAULT_PROFILES, ROUTING_DECISION hook
+- OpenRouter, get_default_profiles, ROUTING_DECISION hook (includes routing_latency_ms)
+
+**[Multimodal](multimodal.md)** - Images, files, and generation
+- Multimodal input: content parts, `file_to_message`, playground paste/attach
+- Image/video generation: standalone API, Agent `output_media` or `image_generation` / `video_generation`
+- Hooks, StrEnums, custom providers
 
 **[Concept Map](concept-map.md)** — Budget vs TokenLimits vs Memory (quick reference)
 
@@ -168,6 +173,7 @@ Trace and debug agent execution with spans and sessions. Use `debug=True` or `--
 - **Agents** → [Agent Documentation](agent/README.md) — complete agent reference
 - **Models** → [Models Guide](models.md) — built-in, custom, inheritance
 - **Routing** → [Routing](routing.md) — model list, task classification, OpenRouter
+- **Multimodal** → [Multimodal](multimodal.md) — images in/out, file_to_message, image/video generation
 - **Tools** → [Use Case 2](research-agent-with-tools.md)
 - **Memory** → [Use Case 3](agent-with-memory.md)
 - **Budget** → [Use Case 4](budget-control.md)

@@ -35,7 +35,7 @@ class TestEmbeddingClassifierWithMock:
         """Fake encode that returns fixed embeddings per prompt prefix."""
 
         def _encode(
-            self_or_texts: object, texts: object | None = None, **kwargs: object
+            self_or_texts: object, texts: object | None = None, **_kwargswargs: object
         ) -> list[list[float]]:
             t_list = texts if texts is not None else self_or_texts
             if not isinstance(t_list, list):
@@ -99,7 +99,7 @@ class TestEmbeddingClassifierWithMock:
     def test_classify_is_lazy_model_load(self) -> None:
         load_called = []
 
-        def track_load(*args: object, **kwargs: object) -> object:
+        def track_load(*args: object, **_kwargswargs: object) -> object:
             load_called.append(1)
             return type(
                 "Mock", (), {"encode": lambda _s, texts, **_k: [[0.0] * 384 for _ in texts]}
@@ -132,9 +132,9 @@ class TestPromptClassifierValidation:
 
     def test_defaults(self) -> None:
         c = PromptClassifier()
-        assert c.min_confidence == 0.6
+        assert c.min_confidence == 0.35
         assert c.low_confidence_fallback == TaskType.GENERAL
-        assert c.model == "sentence-transformers/all-MiniLM-L6-v2"
+        assert c.embedding_model == "sentence-transformers/all-MiniLM-L6-v2"
         assert c.cache_dir is None
 
     def test_custom_low_confidence_fallback(self) -> None:
@@ -217,14 +217,15 @@ class TestPromptClassifierClassify:
             assert task == TaskType.GENERAL
             assert confidence == 0.0
 
-    def test_classify_preserves_import_error(self) -> None:
+    def test_classify_preserves_import_error_when_keyword_fallback_disabled(self) -> None:
+        """When use_keyword_fallback=False and embeddings missing, ImportError propagates."""
         from syrin.router.classifier import _CLASSIFIER_IMPORT_ERROR
 
         with patch(
             "syrin.router.classifier._load_sentence_transformers",
             side_effect=ImportError(_CLASSIFIER_IMPORT_ERROR),
         ):
-            c = PromptClassifier()
+            c = PromptClassifier(use_keyword_fallback=False)
             with pytest.raises(ImportError) as exc_info:
                 c.classify("test")
             assert "classifier-embeddings" in str(exc_info.value)
@@ -233,13 +234,13 @@ class TestPromptClassifierClassify:
         load_called = []
 
         def fake_encode(
-            self_or_texts: object, texts: object | None = None, **k: object
+            self_or_texts: object, texts: object | None = None, **_kwargs: object
         ) -> list[list[float]]:
             t_list = texts if texts is not None else self_or_texts
             n = len(t_list) if isinstance(t_list, list) else 1
             return [[0.0] * 384 for _ in range(n)]
 
-        def track_load(*args: object, **kwargs: object) -> object:
+        def track_load(*args: object, **_kwargswargs: object) -> object:
             load_called.append(1)
             return type("Mock", (), {"encode": fake_encode})()
 
@@ -303,6 +304,9 @@ class TestClassifyExtended:
         class MockEmb:
             def _ensure_loaded(self) -> None:
                 pass
+
+            def _encode(self, texts: list[str]) -> list[list[float]]:
+                return [[0.1] * dim for _ in texts]
 
             def classify(self, prompt: str) -> tuple[TaskType, float]:
                 return (task, confidence)
@@ -424,6 +428,11 @@ class TestClassifyExtendedEdgeCases:
         mock.classify = lambda _: (task, confidence)
         mock.complexity_score = lambda _: 0.2
         mock.system_alignment_score = lambda _a, _b: 0.5
+
+        def _encode(texts: list[str]) -> list[list[float]]:
+            return [[0.0] * dim for _ in texts]
+
+        mock._encode = _encode
         mock._model = type(
             "M",
             (),
@@ -574,3 +583,86 @@ class TestComplexityHeuristic:
 
         s = _complexity_heuristic("What is the capital of France?")
         assert s < 0.4
+
+
+class TestClassifyBatch:
+    """classify_batch uses real batch encoding — one encode() call for all prompts."""
+
+    def test_classify_batch_calls_encode_once(self) -> None:
+        encode_calls: list[list[str]] = []
+
+        def track_encode(
+            _self_or_texts: object, texts: object | None = None, **_kwargs: object
+        ) -> list[list[float]]:
+            t_list = texts if texts is not None else _self_or_texts
+            if isinstance(t_list, list):
+                encode_calls.append(list(t_list))
+            else:
+                encode_calls.append([t_list])
+            dim = 384
+            n = len(t_list) if isinstance(t_list, list) else 1
+            return [[0.1] * dim for _ in range(n)]
+
+        mock_model = type(
+            "M", (), {"encode": lambda self, texts, **_kwargs: track_encode(self, texts)}
+        )()
+
+        with patch("syrin.router.classifier._load_sentence_transformers", return_value=mock_model):
+            c = PromptClassifier(use_keyword_fallback=False)
+            prompts = ["write a function", "hello world", "debug this"]
+            results = c.classify_batch(prompts)
+            assert len(results) == 3
+            assert all(isinstance(r, tuple) and len(r) == 2 for r in results)
+            batch_calls = [c for c in encode_calls if c == prompts]
+            assert len(batch_calls) == 1
+            assert len(batch_calls[0]) == 3
+
+    def test_classify_batch_preserves_order(self) -> None:
+        def encode_batch(
+            _self_or_texts: object, texts: object | None = None, **_kwargs: object
+        ) -> list[list[float]]:
+            t_list = texts if texts is not None else _self_or_texts
+            t_list = t_list if isinstance(t_list, list) else [t_list]
+            dim = 384
+            return [[float(hash(t) % 100) / 100] * dim for t in t_list]
+
+        mock_model = type(
+            "M", (), {"encode": lambda self, texts, **_kwargs: encode_batch(self, texts)}
+        )()
+
+        with patch("syrin.router.classifier._load_sentence_transformers", return_value=mock_model):
+            c = PromptClassifier(use_keyword_fallback=False)
+            prompts = ["a", "b", "c"]
+            results = c.classify_batch(prompts)
+            assert [r[0] for r in results]  # Order preserved
+            assert len(results) == 3
+
+    def test_classify_batch_empty_returns_empty(self) -> None:
+        c = PromptClassifier()
+        assert c.classify_batch([]) == []
+
+    def test_classify_batch_keyword_matches_skip_embedding(self) -> None:
+        prompt_encode_count: list[int] = [0]
+
+        def track_prompt_encode(
+            _self_or_texts: object, texts: object | None = None, **_kwargs: object
+        ) -> list[list[float]]:
+            t_list = texts if texts is not None else _self_or_texts
+            t_list = t_list if isinstance(t_list, list) else [t_list]
+            if t_list == ["write a function"]:
+                prompt_encode_count[0] += 1
+            return [[0.0] * 384 for _ in t_list]
+
+        mock_model = type(
+            "M", (), {"encode": lambda self, texts, **_kwargs: track_prompt_encode(self, texts)}
+        )()
+
+        with patch("syrin.router.classifier._load_sentence_transformers", return_value=mock_model):
+            c = PromptClassifier(use_keyword_fallback=True)
+            prompts = ["generate an image of a cat", "write a function"]
+            results = c.classify_batch(prompts)
+            assert len(results) == 2
+            assert results[0][0] == TaskType.IMAGE_GENERATION
+            assert results[0][1] > 0
+            assert results[1][0] in (TaskType.CODE, TaskType.GENERAL, TaskType.CREATIVE)
+            assert prompt_encode_count[0] == 1

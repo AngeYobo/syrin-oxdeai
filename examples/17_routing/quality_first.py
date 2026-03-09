@@ -8,7 +8,6 @@ from __future__ import annotations
 from syrin import Agent
 from syrin.model import Model
 from syrin.router import (
-    ModelProfile,
     ModelRouter,
     RouterConfig,
     RoutingMode,
@@ -17,30 +16,31 @@ from syrin.router import (
 
 
 def main() -> None:
-    cheap = Model.Almock(pricing_tier="low", latency_min=0, latency_max=0)
-    premium = Model.Almock(pricing_tier="high", latency_min=0, latency_max=0)
+    cheap = Model.Almock(
+        pricing_tier="low",
+        latency_min=0,
+        latency_max=0,
+        profile_name="cheap",
+        strengths=[TaskType.GENERAL, TaskType.CODE],
+        priority=80,
+    )
+    premium = Model.Almock(
+        pricing_tier="high",
+        latency_min=0,
+        latency_max=0,
+        profile_name="premium",
+        strengths=[TaskType.GENERAL, TaskType.CODE, TaskType.REASONING],
+        priority=100,
+    )
 
-    profiles = [
-        ModelProfile(
-            model=cheap,
-            name="cheap",
-            strengths=[TaskType.GENERAL, TaskType.CODE],
-            priority=80,
-        ),
-        ModelProfile(
-            model=premium,
-            name="premium",
-            strengths=[TaskType.GENERAL, TaskType.CODE, TaskType.REASONING],
-            priority=100,
-        ),
-    ]
+    models_list = [cheap, premium]
     router = ModelRouter(
-        profiles=profiles,
+        models=models_list,
         routing_mode=RoutingMode.QUALITY_FIRST,
     )
 
     agent = Agent(
-        model=[cheap, premium],
+        model=models_list,
         router_config=RouterConfig(router=router),
         system_prompt="You are helpful.",
     )

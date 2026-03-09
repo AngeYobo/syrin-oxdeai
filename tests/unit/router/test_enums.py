@@ -1,8 +1,8 @@
-"""Tests for router enums — TaskType, Modality, RoutingMode, ComplexityTier."""
+"""Tests for router enums — TaskType, RoutingMode, ComplexityTier. Media lives in syrin.enums."""
 
 from __future__ import annotations
 
-from syrin.router import ComplexityTier, Modality, RoutingMode, TaskType
+from syrin.router import ComplexityTier, RoutingMode, TaskType
 
 
 class TestComplexityTier:
@@ -34,7 +34,9 @@ class TestTaskType:
             "code",
             "general",
             "vision",
+            "image_generation",
             "video",
+            "video_generation",
             "planning",
             "reasoning",
             "creative",
@@ -53,28 +55,7 @@ class TestTaskType:
         assert TaskType("general") is TaskType.GENERAL
 
     def test_members_count(self) -> None:
-        assert len(TaskType) == 8
-
-
-class TestModality:
-    """Tests for Modality enum."""
-
-    def test_all_values_present(self) -> None:
-        expected = {"text", "image", "video", "audio", "file"}
-        actual = {m.value for m in Modality}
-        assert actual == expected
-
-    def test_strenum_string_value(self) -> None:
-        assert Modality.TEXT == "text"
-        assert Modality.IMAGE == "image"
-        assert Modality.FILE == "file"
-
-    def test_from_string_compatible(self) -> None:
-        assert Modality("image") is Modality.IMAGE
-        assert Modality("text") is Modality.TEXT
-
-    def test_members_count(self) -> None:
-        assert len(Modality) == 5
+        assert len(TaskType) == 10
 
 
 class TestRoutingMode:

@@ -183,7 +183,7 @@ def main() -> None:
     print("""
   DOES:
   - Embed user prompt with sentence-transformers
-  - Return (TaskType, confidence). Router maps TaskType → ModelProfile
+  - Return (TaskType, confidence). Router maps TaskType → Model
   - classify_extended(): complexity_score, complexity_tier (LOW/MEDIUM/HIGH)
   - classify_extended(): system_alignment_score when system_prompt provided
   - LRU cache (enable_cache, max_cache_size) for production

@@ -1,6 +1,6 @@
-"""Minimal Agent routing — model list + RouterConfig, no explicit profiles.
+"""Minimal Agent routing — model list + RouterConfig.
 
-Uses profiles_from_models() to auto-build profiles. All models get GENERAL strength
+All models get GENERAL strength
 by default. Best for simple cost/quality trade-off, not task-specific routing.
 
 Features: model=[M1, M2, M3], RouterConfig(routing_mode=...).

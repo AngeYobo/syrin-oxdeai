@@ -22,7 +22,6 @@ from dotenv import load_dotenv
 from syrin import Agent, Budget, Hook
 from syrin.model import Model
 from syrin.router import (
-    ModelProfile,
     ModelRouter,
     RouterConfig,
     RoutingMode,
@@ -58,42 +57,31 @@ def build_models() -> tuple[Model, Model, Model, Model, Model]:
 def main() -> None:
     gpt_mini, gpt4o, gemini, claude, deepseek = build_models()
 
-    profiles = [
-        ModelProfile(
-            model=gpt_mini,
-            name="gpt-4o-mini",
-            strengths=[TaskType.GENERAL, TaskType.CREATIVE],
-            priority=85,
+    models_list = [
+        gpt_mini.with_routing(
+            profile_name="gpt-4o-mini", strengths=[TaskType.GENERAL, TaskType.CREATIVE], priority=85
         ),
-        ModelProfile(
-            model=gpt4o,
-            name="gpt-4o",
-            strengths=[TaskType.CODE, TaskType.REASONING],
-            priority=95,
+        gpt4o.with_routing(
+            profile_name="gpt-4o", strengths=[TaskType.CODE, TaskType.REASONING], priority=95
         ),
-        ModelProfile(
-            model=gemini,
-            name="gemini",
+        gemini.with_routing(
+            profile_name="gemini",
             strengths=[TaskType.GENERAL, TaskType.REASONING, TaskType.VISION],
             priority=90,
         ),
-        ModelProfile(
-            model=claude,
-            name="claude-sonnet",
+        claude.with_routing(
+            profile_name="claude-sonnet",
             strengths=[TaskType.CODE, TaskType.REASONING, TaskType.PLANNING],
             priority=100,
         ),
-        ModelProfile(
-            model=deepseek,
-            name="deepseek",
-            strengths=[TaskType.CODE, TaskType.GENERAL],
-            priority=80,
+        deepseek.with_routing(
+            profile_name="deepseek", strengths=[TaskType.CODE, TaskType.GENERAL], priority=80
         ),
     ]
 
-    router = ModelRouter(profiles=profiles, routing_mode=RoutingMode.AUTO)
+    router = ModelRouter(models=models_list, routing_mode=RoutingMode.AUTO)
     agent = Agent(
-        model=[gpt_mini, gpt4o, gemini, claude, deepseek],
+        model=models_list,
         router_config=RouterConfig(router=router),
         system_prompt="You are helpful. Be concise.",
         budget=Budget(run=2.0),

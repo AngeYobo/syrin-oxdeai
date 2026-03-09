@@ -15,6 +15,7 @@ from syrin.types.validation import ValidationAttempt
 T = TypeVar("T")
 
 __all__ = [
+    "MediaAttachment",
     "StructuredOutput",
     "TraceStep",
     "Response",
@@ -137,6 +138,26 @@ class TraceStep:
     cost_usd: float = 0.0
     latency_ms: float = 0.0
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class MediaAttachment:
+    """Media attachment (image, video, audio) in agent responses.
+
+    Use content_bytes for inline binary data, or url for references.
+    content_type is the MIME type (e.g. image/png, video/mp4).
+
+    Attributes:
+        type: Media type — image, video, or audio.
+        content_bytes: Inline binary content. None if url is used.
+        url: URL reference. None if content_bytes is used.
+        content_type: MIME type (e.g. image/png, video/mp4, audio/wav).
+    """
+
+    type: str  # image, video, audio
+    content_type: str
+    content_bytes: bytes | None = None
+    url: str | None = None
 
 
 @dataclass
@@ -402,6 +423,7 @@ class Response(Generic[T]):
 
     content: T
     raw: str = ""
+    attachments: list[MediaAttachment] = field(default_factory=list)
     cost: float = 0.0
     tokens: TokenUsage = field(default_factory=TokenUsage)
     model: str = ""

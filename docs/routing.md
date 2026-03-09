@@ -2,7 +2,7 @@
 
 Intelligent model routing selects the best model based on task type, modality, cost, and developer preferences — **before** any LLM call.
 
-Key components: ModelProfile, ModalityDetector, RouterConfig, ModelRouter, RoutingReason, DEFAULT_PROFILES, Agent integration, OpenRouter, response metadata, ROUTING_DECISION hook.
+Key components: Model (routing fields), ModalityDetector, RouterConfig, ModelRouter, RoutingReason, get_default_profiles, Agent integration, OpenRouter, response metadata, ROUTING_DECISION hook.
 
 ## What Developers Can Build
 
@@ -11,14 +11,14 @@ With the routing system, you can:
 | Capability | How |
 |------------|-----|
 | **Task-based routing** | Route code → Claude, general → GPT-4o-mini, vision → Gemini, etc. |
-| **Cost optimization** | COST_FIRST mode; budget thresholds; `max_cost_per_1k_tokens` cap |
+| **Cost optimization** | COST_FIRST mode; budget thresholds (`prefer_cheaper_below_budget_ratio`, `force_cheapest_below_budget_ratio`) |
 | **Quality-first** | QUALITY_FIRST mode; HIGH complexity → highest-priority model |
 | **Single API key** | OpenRouterBuilder — one key for Anthropic, OpenAI, Google, etc. |
 | **Custom routing logic** | `routing_rule_callback` — VIP prompts, A/B tests, manual overrides |
 | **Force specific model** | `force_model` — bypass routing for debugging or pinned model |
 | **Tools-aware** | Exclude text-only models when Agent has tools (`supports_tools`) |
-| **Vision/Video routing** | `modality_input` — route to vision models when messages have images |
-| **Budget-aware** | `economy_at`, `cheapest_at`, `budget_optimisation` — prefer cheap when low |
+| **Vision/Video routing** | `input_media` — route to vision models when messages have images |
+| **Budget-aware** | `prefer_cheaper_below_budget_ratio`, `force_cheapest_below_budget_ratio`, `budget_optimisation` — prefer cheap when low |
 | **Custom classifier** | Pass `classifier` to RouterConfig for custom task detection |
 | **Production classification** | `classify_extended` — complexity, system alignment, LRU cache |
 | **Observability** | `Hook.ROUTING_DECISION`; `r.routing_reason`, `r.model_used`, `r.actual_cost` |
@@ -35,16 +35,18 @@ Detected task type for routing:
 |-------|-----|
 | `CODE` | Code generation, debugging, review |
 | `GENERAL` | General conversation, Q&A |
-| `VISION` | Image understanding, OCR |
-| `VIDEO` | Video analysis |
+| `VISION` | Image understanding, OCR (input) |
+| `IMAGE_GENERATION` | Create, draw, or generate an image (output) |
+| `VIDEO` | Video analysis, transcription (input) |
+| `VIDEO_GENERATION` | Create or generate a video (output) |
 | `PLANNING` | Task decomposition, strategy |
 | `REASONING` | Math, logic, analysis |
 | `CREATIVE` | Writing, brainstorming |
 | `TRANSLATION` | Language translation |
 
-### Modality
+### Media
 
-Generic enum for content and model capabilities (TEXT, IMAGE, VIDEO, AUDIO, FILE). Use for message content detection and model input/output capabilities.
+Single canonical enum for content and model capabilities: **Media** (TEXT, IMAGE, VIDEO, AUDIO, FILE). Use for message content detection, agent **input_media** / **output_media**, and model profile **input_media** / **output_media**. Import from `syrin.enums` or `syrin.router`.
 
 ### RoutingMode
 
@@ -59,10 +61,13 @@ Generic enum for content and model capabilities (TEXT, IMAGE, VIDEO, AUDIO, FILE
 
 Embedding-based task classification — no LLM needed. Uses sentence-transformers for cosine similarity between prompt and task examples.
 
-**Install optional dependency:**
+**Keyword fallback (no install):** Prompts like "generate an image of X" or "create a video of Y" are detected via keywords and classified as `IMAGE_GENERATION` / `VIDEO_GENERATION` — **no sentence-transformers required**. Use `use_keyword_fallback=True` (default).
+
+**Full classification (optional install):**
 
 ```bash
-uv pip install syrin[classifier-embeddings]
+uv sync --extra classifier-embeddings
+# or: uv pip install 'syrin[classifier-embeddings]'
 ```
 
 **Usage:**
@@ -71,8 +76,8 @@ uv pip install syrin[classifier-embeddings]
 from syrin.router import PromptClassifier, TaskType
 
 classifier = PromptClassifier(
-    model="sentence-transformers/all-MiniLM-L6-v2",
-    min_confidence=0.6,
+    embedding_model="sentence-transformers/all-MiniLM-L6-v2",
+    min_confidence=0.35,  # Raw cosine similarity threshold; unrelated -> 0
     low_confidence_fallback=TaskType.GENERAL,
 )
 
@@ -82,6 +87,17 @@ task_type, confidence = classifier.classify("write a function to sort a list")
 # Low-confidence prompts use fallback
 task_type, confidence = classifier.classify("hi")
 # → (TaskType.GENERAL, 0.35)  # Below min, returns fallback
+```
+
+**Custom embedding provider** — Use OpenAI, Cohere, or any `encode(texts) -> list[list[float]]`:
+
+```python
+class MyEmbeddingProvider:
+    def encode(self, texts: list[str]) -> list[list[float]]:
+        # Call OpenAI / Cohere / etc.
+        return [[0.1] * 384 for _ in texts]
+
+classifier = PromptClassifier(embedding_provider=MyEmbeddingProvider())
 ```
 
 **Custom examples:**
@@ -149,27 +165,31 @@ classifier = PromptClassifier(cache_dir="/path/to/cache")
 
 If `cache_dir` is provided and does not exist, the parent directory must exist and be writable.
 
-## ModelProfile
+## Model routing fields
 
-Define what each model can do — capabilities, strengths, modality, tool support:
+Configure routing per model via Model constructor or `model.with_routing()`:
 
 ```python
 from syrin.model import Model
-from syrin.router import Modality, TaskType
-from syrin.router import ModelProfile
+from syrin.enums import Media
+from syrin.router import TaskType
 
-profile = ModelProfile(
-    model=Model.Anthropic("claude-sonnet-4-5", api_key="..."),
-    name="claude-code",
+model = Model.Anthropic(
+    "claude-sonnet-4-5",
+    api_key="...",
+    profile_name="claude-code",
     strengths=[TaskType.CODE, TaskType.REASONING, TaskType.PLANNING],
-    modality_input={Modality.TEXT},
-    modality_output={Modality.TEXT},
+    input_media={Media.TEXT},
+    output_media={Media.TEXT},
     supports_tools=True,
     priority=100,
 )
+
+# Or add routing to existing model
+model = gpt4_mini.with_routing(strengths=[TaskType.CODE], profile_name="code")
 ```
 
-Cost is derived from `model.pricing` (or MODEL_PRICING lookup). `supports_tools=False` excludes the profile when tools are present.
+When `strengths`, `input_media`, `output_media`, `priority`, or `supports_tools` are set on Model, `ModelRouter` uses them. `supports_tools=False` excludes the model when tools are present.
 
 ## ModalityDetector
 
@@ -180,10 +200,16 @@ from syrin.router import ModalityDetector
 from syrin.types import Message
 
 detector = ModalityDetector()
-modalities = detector.detect(messages)  # {Modality.TEXT}, or + IMAGE, VIDEO, AUDIO
+media = detector.detect(messages)  # set[Media]: {Media.TEXT}, or + IMAGE, VIDEO, AUDIO
 ```
 
 Detects base64 data URLs (`data:image/...;base64,...`) in message content.
+
+## Multimodal and generation
+
+**Multimodal input** (text + images/files) and **image/video generation** have their own guide: **[Multimodal](multimodal.md)**.
+
+There you’ll find: content parts, `file_to_message`, PDF extraction, playground paste/attach; standalone `generate_image` / `generate_video`; declarative Agent API (`output_media={Media.IMAGE, Media.VIDEO}` for generation tools); hooks and StrEnums. The router’s **ModalityDetector** (above) routes messages that contain images to vision-capable profiles — see [Multimodal — Routing and vision](multimodal.md#routing-and-vision).
 
 ## Agent Integration
 
@@ -266,8 +292,8 @@ from syrin.router import RouterConfig, RoutingMode
 config = RouterConfig(
     routing_mode=RoutingMode.AUTO,
     budget_optimisation=True,
-    economy_at=0.20,
-    cheapest_at=0.10,
+    prefer_cheaper_below_budget_ratio=0.20,
+    force_cheapest_below_budget_ratio=0.10,
 )
 ```
 
@@ -277,11 +303,9 @@ config = RouterConfig(
 | `force_model` | None | Bypass routing; always use this model |
 | `classifier` | None | Custom PromptClassifier; None = default embeddings-based |
 | `router` | None | Explicit ModelRouter; overrides auto-created from model list |
-| `profiles` | None | Custom profiles; override auto-generated from model list |
 | `budget_optimisation` | True | Prefer cheaper models when budget runs low |
-| `economy_at` | 0.20 | When remaining/limit < 20%, prefer cheaper capable models |
-| `cheapest_at` | 0.10 | When remaining/limit < 10%, force cheapest capable model |
-| `max_cost_per_1k_tokens` | None | Cap on cost per 1K tokens when selecting models |
+| `prefer_cheaper_below_budget_ratio` | 0.20 | When remaining/limit < 20%, prefer cheaper capable models |
+| `force_cheapest_below_budget_ratio` | 0.10 | When remaining/limit < 10%, force cheapest capable model |
 | `routing_rule_callback` | None | `(prompt, task_type, profile_names) -> profile_name | None` |
 
 **Custom routing callback** — VIP prompts, A/B logic, or manual overrides:
@@ -303,27 +327,32 @@ agent = Agent(
 **MANUAL mode** — You provide task type; no classification:
 
 ```python
-router = ModelRouter(profiles=profiles, routing_mode=RoutingMode.MANUAL)
+router = ModelRouter(models=models, routing_mode=RoutingMode.MANUAL)
 model, task, reason = router.route("Fix this", task_override=TaskType.CODE)
 ```
 
-## profiles_from_models
+## Model capabilities
 
-Build profiles from a model list for simple routing (all models get GENERAL strength):
+ModelRouter derives routing metadata from each Model. **Auto-detects strengths** from model IDs when not set:
+
+- Claude → CODE, REASONING, PLANNING
+- GPT-4o/GPT-4 → GENERAL, VISION, CREATIVE
+- GPT-4o-mini/GPT-3.5 → GENERAL
+- Gemini → VISION, VIDEO, GENERAL
+
+Configure routing per-model via **Model routing fields** (recommended): `strengths`, `input_media`, `output_media`, `priority`, `supports_tools`. When set on Model, those values are used. Otherwise, auto-inference applies.
+
+**Model capabilities registry** — Register custom models (DeepSeek, Mistral, Qwen, etc.):
 
 ```python
-from syrin.model import Model
-from syrin.router import profiles_from_models, ModelRouter, TaskType
+from syrin.router import register_model_capabilities
 
-profiles = profiles_from_models([
-    Model.OpenAI("gpt-4o-mini", api_key="..."),
-    Model.Anthropic("claude-sonnet", api_key="..."),
-], strengths=[TaskType.GENERAL])  # Optional; default GENERAL
-
-router = ModelRouter(profiles=profiles)
+register_model_capabilities(
+    "deepseek",
+    [TaskType.CODE, TaskType.REASONING, TaskType.GENERAL],
+)
+# Now ModelRouter(models=[Model(provider="custom", model_id="deepseek-v3")]) infers CODE, REASONING
 ```
-
-For specialized routing (code vs vision), define `ModelProfile` directly with per-model strengths.
 
 ## ModelRouter
 
@@ -331,25 +360,12 @@ Main routing class. Selects the best model based on task, modality, cost, and bu
 
 ```python
 from syrin.model import Model
-from syrin.router import (
-    ModelProfile,
-    ModelRouter,
-    RoutingMode,
-    TaskType,
-)
+from syrin.router import ModelRouter, RoutingMode, TaskType
 
 router = ModelRouter(
-    profiles=[
-        ModelProfile(
-            model=Model.Anthropic("claude-sonnet-4-5", api_key="..."),
-            name="code",
-            strengths=[TaskType.CODE, TaskType.REASONING],
-        ),
-        ModelProfile(
-            model=Model.OpenAI("gpt-4o-mini", api_key="..."),
-            name="general",
-            strengths=[TaskType.GENERAL],
-        ),
+    models=[
+        Model.Anthropic("claude-sonnet-4-5", api_key="...", profile_name="code", strengths=[TaskType.CODE, TaskType.REASONING]),
+        Model.OpenAI("gpt-4o-mini", api_key="...", profile_name="general", strengths=[TaskType.GENERAL]),
     ],
     routing_mode=RoutingMode.AUTO,
 )
@@ -368,9 +384,20 @@ model, task, reason = router.route("Fix this", task_override=TaskType.CODE)
 
 ```python
 router = ModelRouter(
-    profiles=[...],
+    models=[...],
     force_model=Model.Anthropic("claude-opus", api_key="..."),
 )
+```
+
+**Fallback routing:** `route_ordered()` returns ranked list of (model, task_type, reason) for try-until-success:
+
+```python
+for model, task, reason in router.route_ordered("hello", max_alternatives=3):
+    try:
+        resp = await model.acomplete(messages)
+        break
+    except ProviderError:
+        continue
 ```
 
 ## RoutingReason
@@ -388,13 +415,13 @@ Returned by `router.route()`. Explains the selection:
 
 ## Default Profiles
 
-Use or override built-in profiles:
+Use or override built-in profiles (lazy — no import-side model creation):
 
 ```python
-from syrin.router import DEFAULT_PROFILES
+from syrin.router import get_default_profiles
 
-profiles = list(DEFAULT_PROFILES.values())
-router = ModelRouter(profiles=profiles)
+models = list(get_default_profiles().values())
+router = ModelRouter(models=models)
 ```
 
 Default profiles: `claude-code`, `gpt-general`, `gemini-vision`. Pass API keys when using with Agent.
@@ -403,8 +430,8 @@ Default profiles: `claude-code`, `gpt-general`, `gemini-vision`. Pass API keys w
 
 When `budget_optimisation=True` (default) and Agent has a run budget:
 
-- `economy_at` (default 0.20): When remaining/limit < 20%, router prefers cheaper capable models
-- `cheapest_at` (default 0.10): When remaining/limit < 10%, router forces cheapest capable model
+- `prefer_cheaper_below_budget_ratio` (default 0.20): When remaining/limit < 20%, router prefers cheaper capable models
+- `force_cheapest_below_budget_ratio` (default 0.10): When remaining/limit < 10%, router forces cheapest capable model
 
 Use with `Budget(run=1.0)` for cost-sensitive agents.
 
@@ -417,7 +444,7 @@ from syrin.router import PromptClassifier, RouterConfig, TaskType
 
 classifier = PromptClassifier(
     examples={TaskType.CODE: ["write", "debug", "implement"], ...},
-    min_confidence=0.7,
+    min_confidence=0.35,
 )
 
 agent = Agent(
@@ -432,7 +459,7 @@ Or pass a classifier to `ModelRouter` directly when using standalone routing.
 
 When using Agent with routing, the response includes:
 
-- `r.routing_reason` — `RoutingReason` (selected_model, task_type, reason, cost_estimate, alternatives, classification_confidence, complexity_tier, system_alignment_score)
+- `r.routing_reason` — `RoutingReason` (selected_model, task_type, reason, cost_estimate, alternatives, classification_confidence, complexity_tier, system_alignment_score). `Hook.ROUTING_DECISION` includes `routing_latency_ms`.
 - `r.model_used` — Model ID that answered (from provider/OpenRouter headers when available)
 - `r.task_type` — Detected or overridden task type
 - `r.actual_cost` — Actual cost when provider reports it (e.g. OpenRouter `x-openrouter-total-cost`)

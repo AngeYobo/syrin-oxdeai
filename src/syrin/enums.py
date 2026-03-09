@@ -300,13 +300,24 @@ class AlmockPricing(StrEnum):
     ULTRA_HIGH = "ultra_high"
 
 
-class ContentType(StrEnum):
-    """Multi-modal content types."""
+class Media(StrEnum):
+    """Single canonical enum for content and model capabilities.
+
+    Use for: message content type, agent input/output capabilities, router profile
+    support, and file/media detection. One enum everywhere — no Modality/ContentType split.
+
+    Attributes:
+        TEXT: Plain text.
+        IMAGE: Image input/output.
+        VIDEO: Video input/output.
+        AUDIO: Audio input/output.
+        FILE: Generic file attachment (e.g. PDF); use with InputFileRules for allowed types.
+    """
 
     TEXT = "text"
     IMAGE = "image"
-    AUDIO = "audio"
     VIDEO = "video"
+    AUDIO = "audio"
     FILE = "file"
 
 
@@ -353,6 +364,13 @@ class Hook(StrEnum):
     MODEL_SWITCH = "model.switch"
 
     ROUTING_DECISION = "routing.decision"
+
+    GENERATION_IMAGE_START = "generation.image.start"
+    GENERATION_IMAGE_END = "generation.image.end"
+    GENERATION_IMAGE_ERROR = "generation.image.error"
+    GENERATION_VIDEO_START = "generation.video.start"
+    GENERATION_VIDEO_END = "generation.video.end"
+    GENERATION_VIDEO_ERROR = "generation.video.error"
 
     HANDOFF_START = "handoff.start"
     HANDOFF_END = "handoff.end"
@@ -423,6 +441,31 @@ class Hook(StrEnum):
     PIPELINE_END = "pipeline.end"
     PIPELINE_AGENT_START = "pipeline.agent.start"
     PIPELINE_AGENT_COMPLETE = "pipeline.agent.complete"
+
+
+class AspectRatio(StrEnum):
+    """Aspect ratio for generated images or videos.
+
+    Attributes:
+        ONE_TO_ONE: 1:1 (square).
+        THREE_FOUR: 3:4 (portrait).
+        FOUR_THREE: 4:3 (landscape).
+        NINE_SIXTEEN: 9:16 (portrait).
+        SIXTEEN_NINE: 16:9 (landscape).
+    """
+
+    ONE_TO_ONE = "1:1"
+    THREE_FOUR = "3:4"
+    FOUR_THREE = "4:3"
+    NINE_SIXTEEN = "9:16"
+    SIXTEEN_NINE = "16:9"
+
+
+class OutputMimeType(StrEnum):
+    """Output MIME type for generated images."""
+
+    IMAGE_PNG = "image/png"
+    IMAGE_JPEG = "image/jpeg"
 
 
 class DocFormat(StrEnum):

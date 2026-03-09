@@ -1,5 +1,7 @@
 "use client";
 
+import { useCallback, useState } from "react";
+
 function formatHookLabel(hook: string, ctx: Record<string, unknown>): string {
   const tool = ctx?.tool ?? ctx?.tool_name;
   const agent = ctx?.agent_type ?? ctx?.agent ?? ctx?.agent_name;
@@ -76,23 +78,90 @@ function formatHookLabel(hook: string, ctx: Record<string, unknown>): string {
   }
 }
 
-function EventCard({ hook, ctx }: { hook: string; ctx: Record<string, unknown> }) {
+const MAX_DATA_URL_DISPLAY = 100;
+
+function formatCtxValue(val: unknown): React.ReactNode {
+  if (val == null) return <span className="trace-event-val">{String(val)}</span>;
+  const raw = typeof val === "object" ? JSON.stringify(val) : String(val);
+  const display = raw.length > MAX_DATA_URL_DISPLAY ? raw.slice(0, MAX_DATA_URL_DISPLAY) + "…" : raw;
+  const isDataImage = typeof val === "string" && val.startsWith("data:image");
+  return (
+    <span className="trace-event-val">
+      {isDataImage && (
+        <img
+          src={val as string}
+          alt=""
+          className="trace-event-img-preview"
+          width={80}
+          height={80}
+        />
+      )}
+      <code>{display}</code>
+    </span>
+  );
+}
+
+function CopyButton({
+  text,
+  className,
+  title,
+}: {
+  text: string;
+  className?: string;
+  title?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      /* ignore */
+    }
+  }, [text]);
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={copy}
+      title={title ?? "Copy"}
+      aria-label={title ?? "Copy"}
+    >
+      {copied ? "✓" : "⎘"}
+    </button>
+  );
+}
+
+function EventCard({
+  hook,
+  ctx,
+}: {
+  hook: string;
+  ctx: Record<string, unknown>;
+}) {
   const label = formatHookLabel(hook, ctx);
   const keys = Object.keys(ctx).filter(
     (k) => !["tokens", "token_usage"].includes(k) && ctx[k] != null
   );
+  const sectionText = JSON.stringify({ hook, ctx }, null, 2);
 
   return (
     <div className="trace-event-card">
-      <div className="trace-event-label">{label}</div>
+      <div className="trace-event-header">
+        <span className="trace-event-label">{label}</span>
+        <CopyButton
+          text={sectionText}
+          className="trace-copy-btn trace-copy-section"
+          title="Copy section"
+        />
+      </div>
       {keys.length > 0 && (
         <div className="trace-event-ctx">
           {keys.map((k) => (
             <div key={k} className="trace-event-row">
               <span className="trace-event-key">{k}:</span>
-              <span className="trace-event-val">
-                {typeof ctx[k] === "object" ? JSON.stringify(ctx[k]) : String(ctx[k])}
-              </span>
+              {formatCtxValue(ctx[k])}
             </div>
           ))}
         </div>
@@ -115,12 +184,20 @@ interface TraceSidebarProps {
 }
 
 export function TraceSidebar({ events, cost, tokens, onClose, isOpen }: TraceSidebarProps) {
-  if (!isOpen) return null;
-
   const totalTokens =
     tokens?.total_tokens ??
     tokens?.total ??
     (tokens?.input_tokens ?? 0) + (tokens?.output_tokens ?? 0);
+
+  const allLogsText = [
+    cost != null && `Cost: $${Number(cost).toFixed(6)}`,
+    totalTokens > 0 && `Tokens: ${totalTokens}`,
+    ...events.map((e) => JSON.stringify({ hook: e.hook, ctx: e.ctx }, null, 2)),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  if (!isOpen) return null;
 
   return (
     <>
@@ -128,14 +205,21 @@ export function TraceSidebar({ events, cost, tokens, onClose, isOpen }: TraceSid
       <aside className="trace-sidebar" role="dialog" aria-label="Reply trace">
         <div className="trace-sidebar-header">
           <h3>Reply trace</h3>
-          <button
-            type="button"
-            className="trace-sidebar-close"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            ×
-          </button>
+          <div className="trace-sidebar-actions">
+            <CopyButton
+              text={allLogsText}
+              className="trace-copy-btn trace-copy-all"
+              title="Copy all logs"
+            />
+            <button
+              type="button"
+              className="trace-sidebar-close"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
         </div>
         <div className="trace-sidebar-body">
           {(cost != null || totalTokens > 0) && (

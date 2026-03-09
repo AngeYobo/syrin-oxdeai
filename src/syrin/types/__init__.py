@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 from syrin.enums import MessageRole
+
+# Multimodal input: plain text or list of content parts (e.g. OpenAI/Anthropic format).
+MultimodalInput = str | list[dict[str, Any]]
 from syrin.types.validation import (
     OutputValidator,
     ToolOutput,
@@ -108,7 +112,10 @@ class Message(BaseModel):
         ...,
         description="Message role: system, user, assistant, or tool",
     )
-    content: str = Field(default="", description="Message text content")
+    content: str | list[dict[str, Any]] = Field(
+        default="",
+        description='Message content: text string or list of content parts (e.g. [{"type":"text","text":"..."}, {"type":"image_url","image_url":{...}}])',
+    )
     tool_call_id: str | None = Field(
         default=None,
         description="ID of the tool call this message responds to (for role=tool)",
@@ -214,6 +221,7 @@ class AgentConfig(BaseModel):
 
 
 __all__ = [
+    "MultimodalInput",
     "ModelConfig",
     "TaskSpec",
     "ToolCall",

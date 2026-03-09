@@ -1,6 +1,6 @@
 """PromptClassifier — embedding-based task type detection.
 
-Requires: uv pip install syrin[classifier-embeddings]
+Requires: uv pip install 'syrin[classifier-embeddings]'
 """
 
 from syrin.router import PromptClassifier, TaskType

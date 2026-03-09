@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, ClassVar, cast
@@ -87,6 +88,7 @@ from syrin.enums import (
     GuardrailStage,
     Hook,
     LoopStrategy,
+    Media,
     MemoryBackend,
     MemoryPreset,
     MemoryType,
@@ -98,6 +100,7 @@ from syrin.exceptions import (
     CircuitBreakerOpenError,
     HandoffBlockedError,
     HandoffRetryRequested,
+    ModalityNotSupportedError,
     ToolExecutionError,
     ValidationError,
 )
@@ -143,6 +146,152 @@ _log = logging.getLogger(__name__)
 _agent_loop: asyncio.AbstractEventLoop | None = None
 
 
+def _validate_agent_media(
+    router: Any,
+    *,
+    input_media: set[Media] | None = None,
+    output_media: set[Media] | None = None,
+) -> None:
+    """Validate that router profiles cover declared input/output media. Raise if not."""
+    if not input_media and not output_media:
+        return
+    profiles = getattr(router, "_profiles", []) or []
+    if not profiles:
+        return
+    input_supported: set[Media] = set()
+    output_supported: set[Media] = set()
+    for p in profiles:
+        inp = getattr(p, "input_media", None) or {Media.TEXT}
+        out = getattr(p, "output_media", None) or {Media.TEXT}
+        input_supported |= inp
+        output_supported |= out
+    if input_media and not (input_media <= input_supported):
+        missing = input_media - input_supported
+        raise ModalityNotSupportedError(
+            f"Agent input_media {sorted(m.value for m in input_media)} require "
+            f"profiles supporting {sorted(m.value for m in missing)}, but router profiles "
+            f"only support {sorted(m.value for m in input_supported)}. "
+            "Add a profile with input_media including these, or relax input_media.",
+            required={m.value for m in input_media},
+            supported={m.value for m in input_supported},
+        )
+    if output_media and not (output_media <= output_supported):
+        missing = output_media - output_supported
+        raise ModalityNotSupportedError(
+            f"Agent output_media {sorted(m.value for m in output_media)} require "
+            f"profiles supporting {sorted(m.value for m in missing)}, but router profiles "
+            f"only support {sorted(m.value for m in output_supported)}. "
+            "Add a profile with output_media including these, or relax output_media.",
+            required={m.value for m in output_media},
+            supported={m.value for m in output_supported},
+        )
+
+
+def _make_generate_image_tool(
+    get_generator: Callable[[], Any],
+    emit: Callable[[str, dict[str, Any]], None] | None = None,
+) -> ToolSpec:
+    """Build a ToolSpec for generate_image. Uses DI — no closure over agent."""
+
+    def generate_image_tool(prompt: str, aspect_ratio: str = "1:1") -> str:
+        img_gen = get_generator()
+        if img_gen is None:
+            return (
+                "Image generation is not available. Provide api_key via a Google model or "
+                "image_generation=ImageGenerator.Gemini(api_key=...). Install: pip install syrin[generation]"
+            )
+        from syrin.enums import AspectRatio
+
+        try:
+            ar = AspectRatio(aspect_ratio)
+        except (ValueError, KeyError, TypeError):
+            ar = AspectRatio.ONE_TO_ONE
+        results = img_gen.generate(prompt, aspect_ratio=ar, emit=emit)
+        if not results:
+            return "Image generation failed."
+        r = results[0]
+        if r.success and r.url:
+            return f"Generated image: {r.url}"
+        return r.error or "Image generation failed."
+
+    schema: dict[str, object] = {
+        "type": "object",
+        "properties": {
+            "prompt": {
+                "type": "string",
+                "description": "Detailed description of the image to generate.",
+            },
+            "aspect_ratio": {
+                "type": "string",
+                "enum": ["1:1", "3:4", "4:3", "9:16", "16:9"],
+                "default": "1:1",
+                "description": "Aspect ratio: 1:1, 3:4, 4:3, 9:16, or 16:9.",
+            },
+        },
+        "required": ["prompt"],
+    }
+    return ToolSpec(
+        name="generate_image",
+        description=(
+            "Generate an image from a text description. Use when the user asks to "
+            "create, draw, or generate an image."
+        ),
+        parameters_schema=schema,
+        func=generate_image_tool,
+    )
+
+
+def _make_generate_video_tool(
+    get_generator: Callable[[], Any],
+    emit: Callable[[str, dict[str, Any]], None] | None = None,
+) -> ToolSpec:
+    """Build a ToolSpec for generate_video. Uses DI — no closure over agent."""
+
+    def generate_video_tool(prompt: str, aspect_ratio: str = "16:9") -> str:
+        vid_gen = get_generator()
+        if vid_gen is None:
+            return (
+                "Video generation is not available. Provide api_key via a Google model or "
+                "video_generation=VideoGenerator.Gemini(api_key=...). Install: pip install syrin[generation]"
+            )
+        from syrin.enums import AspectRatio
+
+        try:
+            ar = AspectRatio(aspect_ratio)
+        except (ValueError, KeyError, TypeError):
+            ar = AspectRatio.SIXTEEN_NINE
+        result = vid_gen.generate(prompt, aspect_ratio=ar, emit=emit)
+        if result.success and result.url:
+            return f"Generated video: {result.url}"
+        return result.error or "Video generation failed."
+
+    schema: dict[str, object] = {
+        "type": "object",
+        "properties": {
+            "prompt": {
+                "type": "string",
+                "description": "Detailed description of the video to generate.",
+            },
+            "aspect_ratio": {
+                "type": "string",
+                "enum": ["16:9", "9:16"],
+                "default": "16:9",
+                "description": "Aspect ratio: 16:9 or 9:16.",
+            },
+        },
+        "required": ["prompt"],
+    }
+    return ToolSpec(
+        name="generate_video",
+        description=(
+            "Generate a short video from a text description. Use when the user asks "
+            "to create or generate a video."
+        ),
+        parameters_schema=schema,
+        func=generate_video_tool,
+    )
+
+
 def _get_agent_loop() -> asyncio.AbstractEventLoop:
     """Get or create a persistent event loop for the agent."""
     global _agent_loop
@@ -164,12 +313,21 @@ def _get_agent_loop() -> asyncio.AbstractEventLoop:
 
 def _merge_class_attrs(mro: tuple[type, ...], name: str, merge: bool) -> Any:
     """From MRO: for 'merge' (e.g. tools) concatenate lists; else first defined."""
+    # Tools may be in "tools" or "_syrin_class_tools" (moved by metaclass to avoid shadowing property)
+    tools_fallback = name == "tools"
+
+    def _get(cls: type, attr: str) -> Any:
+        val = cls.__dict__.get(attr, NOT_PROVIDED)
+        if val is NOT_PROVIDED and tools_fallback:
+            val = cls.__dict__.get("_syrin_class_tools", NOT_PROVIDED)
+        return val
+
     if merge:
         out: list[Any] = []
         for cls in mro:
             if cls is object:
                 continue
-            val = cls.__dict__.get(name, NOT_PROVIDED)
+            val = _get(cls, name)
             if val is NOT_PROVIDED or val is None:
                 continue
             # Skip descriptors (e.g. @property) so we don't merge the property object
@@ -183,12 +341,13 @@ def _merge_class_attrs(mro: tuple[type, ...], name: str, merge: bool) -> Any:
     for cls in mro:
         if cls is object:
             continue
-        if name in cls.__dict__:
-            val = cls.__dict__[name]
-            # Skip descriptors (e.g. @property) so we get class attrs only
-            if hasattr(val, "__get__"):
-                continue
-            return val
+        val = _get(cls, name)
+        if val is NOT_PROVIDED:
+            continue
+        # Skip descriptors (e.g. @property) so we get class attrs only
+        if hasattr(val, "__get__"):
+            continue
+        return val
     return NOT_PROVIDED
 
 
@@ -282,11 +441,25 @@ def _bind_tool_to_instance(spec: ToolSpec, instance: Any) -> ToolSpec:
     return spec
 
 
-def _validate_user_input(user_input: str | None, method: str = "response") -> None:
-    """Raise TypeError if user_input is not str."""
-    if not isinstance(user_input, str):
-        got = type(user_input).__name__ if user_input is not None else "NoneType"
-        raise TypeError(f'user_input must be str, got {got}. Example: agent.{method}("Hello")')
+def _validate_user_input(
+    user_input: str | list[dict[str, Any]] | None,
+    method: str = "response",
+) -> None:
+    """Raise TypeError if user_input is not str or list[dict] (MultimodalInput)."""
+    if user_input is None:
+        raise TypeError(
+            f"user_input must be str or list[dict] (MultimodalInput), got None. "
+            f'Example: agent.{method}("Hello")'
+        )
+    if isinstance(user_input, str):
+        return
+    if isinstance(user_input, list) and all(isinstance(x, dict) for x in user_input):
+        return
+    got = type(user_input).__name__
+    raise TypeError(
+        f"user_input must be str or list[dict] (MultimodalInput), got {got}. "
+        f'Example: agent.{method}("Hello")'
+    )
 
 
 def _resolve_provider(model: Model | None, model_config: ModelConfig) -> Provider:
@@ -429,6 +602,10 @@ class _AgentMeta(type):
                     else:
                         namespace[internal] = val if isinstance(val, str) else ""
                     del namespace[attr]
+        # Move "tools" to _syrin_class_tools so subclasses don't shadow Agent.tools property.
+        # __init_subclass__ merges from both "tools" and "_syrin_class_tools".
+        if "tools" in namespace and not hasattr(namespace["tools"], "__get__"):
+            namespace["_syrin_class_tools"] = namespace.pop("tools")
         # Type-checker-friendly ClassVars: copy into internal so __init__ gets them
         if "_agent_name" in namespace:
             val = namespace["_agent_name"]
@@ -671,6 +848,11 @@ class Agent(Servable, metaclass=_AgentMeta):
         max_child_agents: int | None = None,
         config: AgentConfig | None = None,
         router_config: RouterConfig | None = None,
+        input_media: set[Media] | None = None,
+        output_media: set[Media] | None = None,
+        input_file_rules: Any = None,
+        image_generation: Any = None,
+        video_generation: Any = None,
     ) -> None:
         """Create an agent with model, prompt, tools, and optional config.
 
@@ -721,6 +903,17 @@ class Agent(Servable, metaclass=_AgentMeta):
                 into system prompts. Set False if you don't use them.
             max_child_agents: Cap on concurrent child agents when using spawn().
                 When exceeded, spawn() raises RuntimeError. Default: 10.
+            input_media: Media types the agent accepts (e.g. {Media.TEXT, Media.IMAGE}).
+                Default {Media.TEXT}. Validated against router profiles when using routing.
+            output_media: Media types the agent can produce. {Media.IMAGE} or {Media.VIDEO}
+                enable generate_image/generate_video tools (Gemini when Google model has api_key or
+                explicit image_generation/video_generation).
+            input_file_rules: When Media.FILE is in input_media, allowed MIME types and max size.
+                Use InputFileRules(allowed_mime_types=[...], max_size_mb=10).
+            image_generation: Explicit ImageGenerator for image generation. When set, used instead
+                of auto-created default (output_media + API key). Use for custom providers or config.
+            video_generation: Explicit VideoGenerator for video generation. When set, used instead
+                of auto-created default (output_media + API key). Use for custom providers or config.
 
         Example:
             >>> agent = Agent(
@@ -814,6 +1007,9 @@ class Agent(Servable, metaclass=_AgentMeta):
         tools_list = tools if isinstance(tools, list) else []
         tools_final, mcp_instances = _normalize_tools(tools_list, self)
         budget = _validate_budget(budget)
+        # Resolve router_config from class when None (so subclasses can set router_config = RouterConfig(...))
+        if router_config is None:
+            router_config = getattr(cls, "router_config", None)
         if model is None:
             raise TypeError("Agent requires model (pass explicitly or set class-level model)")
         models_list: list[Model] | None = None
@@ -838,6 +1034,48 @@ class Agent(Servable, metaclass=_AgentMeta):
                 f"model must be Model, list[Model], or ModelConfig, got {type(model).__name__}. "
                 "Use Model.OpenAI(), [Model.OpenAI(), Model.Anthropic()], etc."
             )
+        # Resolve input_media, output_media, input_file_rules (class or param; default TEXT-only)
+        _input_media: set[Media] = (
+            input_media
+            if input_media is not None
+            else getattr(cls, "input_media", None) or {Media.TEXT}
+        )
+        _output_media: set[Media] = (
+            output_media
+            if output_media is not None
+            else getattr(cls, "output_media", None) or {Media.TEXT}
+        )
+        _input_file_rules_final = input_file_rules or getattr(cls, "input_file_rules", None)
+        if Media.FILE in _input_media:
+            if _input_file_rules_final is None:
+                raise ValueError(
+                    "When Media.FILE is in input_media, provide input_file_rules=InputFileRules(allowed_mime_types=[...], max_size_mb=...)."
+                )
+            allowed = getattr(_input_file_rules_final, "allowed_mime_types", None) or []
+            if not allowed:
+                raise ValueError(
+                    "When Media.FILE is in input_media, input_file_rules must have non-empty allowed_mime_types."
+                )
+        if image_generation is not None:
+            from syrin.generation import ImageGenerator
+
+            if not isinstance(image_generation, ImageGenerator):
+                raise TypeError(
+                    f"image_generation must be ImageGenerator or None, got {type(image_generation).__name__}. "
+                    "Use ImageGenerator(provider=...) from syrin.generation."
+                )
+        if video_generation is not None:
+            from syrin.generation import VideoGenerator
+
+            if not isinstance(video_generation, VideoGenerator):
+                raise TypeError(
+                    f"video_generation must be VideoGenerator or None, got {type(video_generation).__name__}. "
+                    "Use VideoGenerator(provider=...) from syrin.generation."
+                )
+        self._input_media = _input_media
+        self._output_media = _output_media
+        self._input_file_rules = _input_file_rules_final
+
         self._router: Any = None
         self._active_model: Model | None = None
         self._active_model_config: ModelConfig | None = None
@@ -857,6 +1095,11 @@ class Agent(Servable, metaclass=_AgentMeta):
                 )
                 self._model = models_list[0]
                 self._model_config = self._model.to_config()
+                _validate_agent_media(
+                    self._router,
+                    input_media=_input_media,
+                    output_media=_output_media,
+                )
         else:
             self._model = None
             self._model_config = model
@@ -876,7 +1119,52 @@ class Agent(Servable, metaclass=_AgentMeta):
         self._template_vars = {**class_pv, **instance_pv}
         self._inject_template_vars = inject_template_vars
         self._call_template_vars: dict[str, Any] | None = None
-        self._tools = tools_final if tools_final else []
+        # Wire generation tools from output_media (IMAGE/VIDEO → Gemini when API key available)
+        # API key comes only from developer: Google model's api_key or explicit ImageGenerator/VideoGenerator
+        _api_key: str | None = None
+        if models_list:
+            for m in models_list:
+                if getattr(m, "_provider", "") == "google":
+                    _api_key = getattr(m, "_api_key", None) or (
+                        m.to_config().api_key if hasattr(m, "to_config") else None
+                    )
+                    break
+        self._generation_api_key: str | None = _api_key
+        from syrin.generation import get_default_image_generator, get_default_video_generator
+
+        _img_gen = (
+            image_generation
+            if image_generation is not None
+            else (get_default_image_generator(_api_key) if Media.IMAGE in _output_media else None)
+        )
+        _vid_gen = (
+            video_generation
+            if video_generation is not None
+            else (get_default_video_generator(_api_key) if Media.VIDEO in _output_media else None)
+        )
+        self._image_generator = _img_gen
+        self._video_generator = _vid_gen
+        _tools_list: list[ToolSpec] = list(tools_final) if tools_final else []
+        _tool_names = {t.name for t in _tools_list}
+        # Add generation tools when: explicit generator, default generator, or output_media declares
+        # IMAGE/VIDEO (tool added so model can call it; returns helpful error if no API key).
+        _add_image_tool = _img_gen is not None or Media.IMAGE in _output_media
+        _add_video_tool = _vid_gen is not None or Media.VIDEO in _output_media
+        if _add_image_tool and "generate_image" not in _tool_names:
+            _tools_list.append(
+                _make_generate_image_tool(
+                    get_generator=self._resolve_image_generator,
+                    emit=self._emit_event,
+                )
+            )
+        if _add_video_tool and "generate_video" not in _tool_names:
+            _tools_list.append(
+                _make_generate_video_tool(
+                    get_generator=self._resolve_video_generator,
+                    emit=self._emit_event,
+                )
+            )
+        self._tools = _tools_list
         self._mcp_instances: list[Any] = mcp_instances
         self._guardrails_disabled: set[str] = set()
         self._tools_disabled: set[str] = set()
@@ -1308,6 +1596,30 @@ class Agent(Servable, metaclass=_AgentMeta):
         event_bus = getattr(self, "_event_bus", None)
         if event_bus is not None:
             _emit_domain_event_for_hook(hook, ctx, event_bus)
+
+    def _resolve_image_generator(self) -> Any:
+        """Resolve image generator. Lazy init from stored key or env if None."""
+        if self._image_generator is not None:
+            return self._image_generator
+        from syrin.generation import get_default_image_generator
+
+        key = getattr(self, "_generation_api_key", None)
+        gen = get_default_image_generator(key) if key else get_default_image_generator()
+        if gen is not None:
+            object.__setattr__(self, "_image_generator", gen)
+        return gen
+
+    def _resolve_video_generator(self) -> Any:
+        """Resolve video generator. Lazy init from stored key or env if None."""
+        if self._video_generator is not None:
+            return self._video_generator
+        from syrin.generation import get_default_video_generator
+
+        key = getattr(self, "_generation_api_key", None)
+        gen = get_default_video_generator(key) if key else get_default_video_generator()
+        if gen is not None:
+            object.__setattr__(self, "_video_generator", gen)
+        return gen
 
     def _print_event(self, event: str, ctx: EventContext) -> None:
         """Print event to console when debug=True."""
@@ -2337,7 +2649,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             return result
         return ""
 
-    def _build_messages(self, user_input: str) -> list[Message]:
+    def _build_messages(self, user_input: str | list[dict[str, Any]]) -> list[Message]:
         def get_capacity() -> Any:
             model_for_context = self._model if self._model is not None else None
             call_ctx = getattr(self, "_call_context", None)
@@ -2495,6 +2807,17 @@ class Agent(Servable, metaclass=_AgentMeta):
                     raise
                 except Exception as e:
                     raise ToolExecutionError(f"Tool {name!r} failed: {e}") from e
+        # Generation tools: return helpful message instead of Unknown tool when missing/unavailable
+        if name == "generate_image":
+            return (
+                "Image generation is not available. Provide api_key via a Google model or "
+                "image_generation=ImageGenerator.Gemini(api_key=...). Install: pip install syrin[generation]"
+            )
+        if name == "generate_video":
+            return (
+                "Video generation is not available. Provide api_key via a Google model or "
+                "video_generation=VideoGenerator.Gemini(api_key=...). Install: pip install syrin[generation]"
+            )
         raise ToolExecutionError(f"Unknown tool: {name!r}")
 
     async def execute_tool(self, name: str, arguments: dict[str, Any]) -> str:
@@ -2789,6 +3112,7 @@ class Agent(Servable, metaclass=_AgentMeta):
             ctx: dict[str, object] = {}
             if self._token_limits is not None:
                 ctx["max_output_tokens"] = getattr(self.run_context, "max_output_tokens", 1024)
+            t0 = time.perf_counter()
             try:
                 routed_model, task_type, reason = self._router.route(
                     prompt,
@@ -2799,6 +3123,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                 )
             except Exception:
                 raise
+            routing_latency_ms = round((time.perf_counter() - t0) * 1000, 2)
             self._active_model = routed_model
             self._active_model_config = routed_model.to_config()
             self._last_routing_reason = reason
@@ -2809,6 +3134,7 @@ class Agent(Servable, metaclass=_AgentMeta):
                     model=routed_model.model_id,
                     task_type=task_type.value if hasattr(task_type, "value") else str(task_type),
                     prompt=prompt[:200] if prompt else "",
+                    routing_latency_ms=routing_latency_ms,
                 ),
             )
             with self._tracer.span(
@@ -2956,10 +3282,15 @@ class Agent(Servable, metaclass=_AgentMeta):
         )
         return r
 
-    def record_conversation_turn(self, user_input: str, assistant_content: str) -> None:
+    def record_conversation_turn(
+        self, user_input: str | list[dict[str, Any]], assistant_content: str
+    ) -> None:
         """Append a user/assistant turn to memory for next context."""
         if self._persistent_memory is not None:
-            self._persistent_memory.add_conversation_segment(user_input, role="user")
+            from syrin.agent._context_builder import _user_input_to_search_str
+
+            text = _user_input_to_search_str(user_input)
+            self._persistent_memory.add_conversation_segment(text, role="user")
             self._persistent_memory.add_conversation_segment(
                 assistant_content or "", role="assistant"
             )
@@ -2980,7 +3311,9 @@ class Agent(Servable, metaclass=_AgentMeta):
                     chunk_size=max(1, size),
                 )
 
-    async def _run_loop_response_async(self, user_input: str) -> Response[str]:
+    async def _run_loop_response_async(
+        self, user_input: str | list[dict[str, Any]]
+    ) -> Response[str]:
         """Run using the configured loop strategy with full observability (async)."""
         from syrin.agent._run import run_agent_loop_async
 
@@ -2988,11 +3321,11 @@ class Agent(Servable, metaclass=_AgentMeta):
         self.record_conversation_turn(user_input, result.content or "")
         return result
 
-    def _run_loop_response(self, user_input: str) -> Response[str]:
+    def _run_loop_response(self, user_input: str | list[dict[str, Any]]) -> Response[str]:
         """Run using the configured loop strategy (sync wrapper)."""
         return _get_agent_loop().run_until_complete(self._run_loop_response_async(user_input))
 
-    def _stream_response(self, user_input: str) -> Iterator[StreamChunk]:
+    def _stream_response(self, user_input: str | list[dict[str, Any]]) -> Iterator[StreamChunk]:
         """Stream response chunks synchronously. Records cost per chunk and checks budget mid-stream."""
         messages = self._build_messages(user_input)
         tools = self.tools if self.tools else None
@@ -3052,7 +3385,7 @@ class Agent(Servable, metaclass=_AgentMeta):
 
     def response(
         self,
-        user_input: str,
+        user_input: str | list[dict[str, Any]],
         context: Context | None = None,
         template_variables: dict[str, Any] | None = None,
         *,
@@ -3115,7 +3448,7 @@ class Agent(Servable, metaclass=_AgentMeta):
 
     async def arun(
         self,
-        user_input: str,
+        user_input: str | list[dict[str, Any]],
         context: Context | None = None,
         template_variables: dict[str, Any] | None = None,
         *,
@@ -3169,7 +3502,7 @@ class Agent(Servable, metaclass=_AgentMeta):
 
     def stream(
         self,
-        user_input: str,
+        user_input: str | list[dict[str, Any]],
         context: Context | None = None,
         template_variables: dict[str, Any] | None = None,
         *,
@@ -3217,7 +3550,7 @@ class Agent(Servable, metaclass=_AgentMeta):
 
     async def astream(
         self,
-        user_input: str,
+        user_input: str | list[dict[str, Any]],
         context: Context | None = None,
         template_variables: dict[str, Any] | None = None,
         *,

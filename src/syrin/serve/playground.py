@@ -64,14 +64,43 @@ _playground_events: contextvars.ContextVar[list[tuple[str, dict[str, Any]]] | No
 )
 
 
+_TRUNCATE_DATA_URL_AT = 100
+_TRUNCATE_STRING_AT = 200
+
+
+def _truncate_data_urls(obj: Any) -> Any:
+    """Truncate long data URLs, content_bytes reprs, and other huge strings in events."""
+    if obj is None or isinstance(obj, (bool, int, float)):
+        return obj
+    if isinstance(obj, bytes):
+        return f"<bytes len={len(obj)}>"
+    if isinstance(obj, str):
+        if len(obj) <= _TRUNCATE_DATA_URL_AT:
+            return obj
+        if obj.startswith("data:image") or obj.startswith("data:video"):
+            return obj[:_TRUNCATE_DATA_URL_AT] + "… [truncated]"
+        if len(obj) > _TRUNCATE_STRING_AT:
+            return obj[:_TRUNCATE_DATA_URL_AT] + "… [truncated]"
+        return obj
+    if isinstance(obj, dict):
+        return {k: _truncate_data_urls(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_truncate_data_urls(x) for x in obj]
+    return obj
+
+
 def _to_json_safe(obj: Any) -> Any:
     """Convert object to JSON-serializable form (handles datetime, objects)."""
-    if obj is None or isinstance(obj, (bool, int, float, str)):
+    if obj is None or isinstance(obj, (bool, int, float)):
         return obj
+    if isinstance(obj, bytes):
+        return _truncate_data_urls(obj)
+    if isinstance(obj, str):
+        return _truncate_data_urls(obj)
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     if isinstance(obj, dict):
-        return {k: _to_json_safe(v) for k, v in obj.items()}
+        return _truncate_data_urls({k: _to_json_safe(v) for k, v in obj.items()})
     if isinstance(obj, (list, tuple)):
         return [_to_json_safe(x) for x in obj]
     # Custom objects (TokenUsage, etc.): convert to dict if has __dict__, else str

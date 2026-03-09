@@ -45,7 +45,7 @@ class AgentRunContext(Protocol):
     """
 
     # ---- Message and completion ----
-    def build_messages(self, user_input: str) -> list[Message]:
+    def build_messages(self, user_input: str | list[dict[str, Any]]) -> list[Message]:
         """Build the message list for the next LLM call (memory + context + user)."""
         ...
 
@@ -143,7 +143,7 @@ class DefaultAgentRunContext:
     def __init__(self, agent: Any) -> None:
         self._agent = agent
 
-    def build_messages(self, user_input: str) -> list[Message]:
+    def build_messages(self, user_input: str | list[dict[str, Any]]) -> list[Message]:
         return cast(list[Message], self._agent._build_messages(user_input))
 
     async def complete(
