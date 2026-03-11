@@ -101,21 +101,6 @@ class TestConversationMemoryParamRemoved:
             Agent(model=_almock(), conversation_memory=Memory())
 
 
-class TestContextNeedsMemoryWarning:
-    """Warn when context needs memory but memory=None."""
-
-    def test_context_mode_intelligent_with_memory_none_warns(self) -> None:
-        """context_mode=intelligent with memory=None emits warning."""
-        from syrin.agent.config import AgentConfig
-        from syrin.context import Context
-        from syrin.enums import ContextMode
-
-        with pytest.warns(UserWarning, match="memory=None|provide memory"):
-            Agent(
-                model=_almock(),
-                memory=None,
-                config=AgentConfig(context=Context(context_mode=ContextMode.INTELLIGENT)),
-            )
 
 
 class TestMemoryProperty:

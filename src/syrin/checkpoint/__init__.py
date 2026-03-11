@@ -341,7 +341,7 @@ class Checkpointer:
 
     def __init__(
         self,
-        strategy: str = "incremental",
+        strategy: str = "full",
         backend: CheckpointBackendProtocol | None = None,
         max_checkpoints: int = 10,
     ) -> None:

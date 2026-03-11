@@ -41,12 +41,10 @@ class ContextMode(StrEnum):
     Attributes:
         FULL: Full conversation history (default). Compaction when over capacity.
         FOCUSED: Keep only last N turns (user+assistant pairs). Reduces irrelevant history.
-        INTELLIGENT: Relevance-filtered (requires scorer; not yet implemented).
     """
 
     FULL = "full"
     FOCUSED = "focused"
-    INTELLIGENT = "intelligent"
 
 
 class MemoryPreset(StrEnum):
@@ -229,7 +227,46 @@ class AuditBackend(StrEnum):
 
 
 class AuditEventType(StrEnum):
-    """Canonical audit event types. Maps from Hook to audit event."""
+    """Canonical audit event types. Maps from Hook to audit event.
+
+    Attributes:
+        AGENT_RUN_START: Agent begins processing user input.
+        AGENT_RUN_END: Agent finishes processing and returns a response.
+        AGENT_INIT: Agent instance created and initialized.
+        AGENT_RESET: Agent state cleared for a new conversation.
+        LLM_CALL: LLM API call completed (includes token usage).
+        LLM_RETRY: LLM call retried after transient failure.
+        LLM_FALLBACK: Switched to fallback model after primary failed.
+        TOOL_CALL: Tool executed successfully.
+        TOOL_ERROR: Tool execution raised an error.
+        HANDOFF_START: Delegating task to another agent.
+        HANDOFF_END: Handoff completed, result received.
+        HANDOFF_BLOCKED: Handoff denied by guardrails or policy.
+        SPAWN_START: Creating a child agent.
+        SPAWN_END: Child agent completed its task.
+        BUDGET_CHECK: Budget check performed during run.
+        BUDGET_THRESHOLD: Budget threshold crossed (e.g. 80%).
+        BUDGET_EXCEEDED: Hard budget limit exceeded.
+        GUARDRAIL_INPUT: Input guardrail chain evaluated.
+        GUARDRAIL_OUTPUT: Output guardrail chain evaluated.
+        GUARDRAIL_BLOCKED: Guardrail blocked the request/response.
+        MEMORY_STORE: Memory entry stored.
+        MEMORY_RECALL: Memory entries recalled.
+        MEMORY_FORGET: Memory entries deleted.
+        PIPELINE_START: Static pipeline execution started.
+        PIPELINE_END: Static pipeline execution completed.
+        PIPELINE_AGENT_START: Pipeline agent step started.
+        PIPELINE_AGENT_COMPLETE: Pipeline agent step completed.
+        DYNAMIC_PIPELINE_START: Dynamic pipeline execution started.
+        DYNAMIC_PIPELINE_PLAN: Dynamic pipeline plan generated.
+        DYNAMIC_PIPELINE_EXECUTE: Dynamic pipeline step executing.
+        DYNAMIC_PIPELINE_AGENT_SPAWN: Dynamic pipeline spawned an agent.
+        DYNAMIC_PIPELINE_AGENT_COMPLETE: Dynamic pipeline agent completed.
+        DYNAMIC_PIPELINE_END: Dynamic pipeline execution finished.
+        DYNAMIC_PIPELINE_ERROR: Dynamic pipeline encountered an error.
+        SERVE_REQUEST_START: Incoming HTTP/A2A request received.
+        SERVE_REQUEST_END: HTTP/A2A response sent.
+    """
 
     # Agent
     AGENT_RUN_START = "agent_run_start"
@@ -321,50 +358,154 @@ class Media(StrEnum):
     FILE = "file"
 
 
-class SandboxRuntime(StrEnum):
-    """Supported sandbox execution runtimes."""
-
-    DOCKER = "docker"
-    E2B = "e2b"
-    LOCAL = "local"
-    SUBPROCESS = "subprocess"
-
-
 class Hook(StrEnum):
-    """Lifecycle hooks — the primary observability mechanism."""
+    """Lifecycle hooks — the primary observability mechanism.
 
+    Register handlers via ``agent.events.on(Hook.XXX, callback)``.
+    Each hook fires with an ``EventContext`` dict whose fields are documented
+    in ``syrin.hooks.HOOK_SCHEMAS``.
+
+    Attributes:
+        AGENT_INIT: Agent instance created and configured.
+        AGENT_RUN_START: Agent begins processing user input.
+        AGENT_RUN_END: Agent finished; response ready.
+        AGENT_RESET: Agent state cleared for new conversation.
+        SERVE_REQUEST_START: Incoming HTTP/A2A request received.
+        SERVE_REQUEST_END: HTTP/A2A response sent.
+        DISCOVERY_REQUEST: Agent card discovery endpoint hit.
+        MCP_CONNECTED: MCP server connection established.
+        MCP_DISCONNECTED: MCP server connection closed.
+        MCP_TOOL_CALL_START: MCP tool invocation starting.
+        MCP_TOOL_CALL_END: MCP tool invocation completed.
+        LLM_REQUEST_START: LLM API call about to be sent.
+        LLM_REQUEST_END: LLM API response received.
+        LLM_STREAM_CHUNK: Streaming chunk received from LLM.
+        LLM_RETRY: LLM call being retried after transient error.
+        LLM_FALLBACK: Switching to fallback model after primary failure.
+        TOOL_CALL_START: Tool execution starting.
+        TOOL_CALL_END: Tool execution completed.
+        TOOL_ERROR: Tool execution raised an error.
+        BUDGET_CHECK: Budget status checked during run loop.
+        BUDGET_THRESHOLD: Budget threshold crossed (e.g. 80%).
+        BUDGET_EXCEEDED: Hard budget limit exceeded.
+        MODEL_SWITCH: Active model changed (threshold action or manual).
+        ROUTING_DECISION: Router selected a model profile for the prompt.
+        GENERATION_IMAGE_START: Image generation request starting.
+        GENERATION_IMAGE_END: Image generation completed.
+        GENERATION_IMAGE_ERROR: Image generation failed.
+        GENERATION_VIDEO_START: Video generation request starting.
+        GENERATION_VIDEO_END: Video generation completed.
+        GENERATION_VIDEO_ERROR: Video generation failed.
+        GENERATION_VOICE_START: Voice/TTS generation request starting.
+        GENERATION_VOICE_END: Voice/TTS generation completed.
+        GENERATION_VOICE_ERROR: Voice/TTS generation failed.
+        HANDOFF_START: Delegating task to another agent.
+        HANDOFF_END: Handoff completed, result received.
+        HANDOFF_BLOCKED: Handoff denied by guardrails or policy.
+        SPAWN_START: Creating a child agent.
+        SPAWN_END: Child agent completed its task.
+        GUARDRAIL_INPUT: Input guardrail chain evaluated.
+        GUARDRAIL_OUTPUT: Output guardrail chain evaluated.
+        GUARDRAIL_BLOCKED: Guardrail blocked the request or response.
+        MEMORY_RECALL: Memory entries recalled by query.
+        MEMORY_STORE: Memory entry persisted.
+        MEMORY_FORGET: Memory entries deleted.
+        MEMORY_CONSOLIDATE: Memory consolidation pass completed.
+        MEMORY_EXTRACT: Automatic memory extraction from conversation.
+        KNOWLEDGE_INGEST_START: Knowledge ingestion starting.
+        KNOWLEDGE_INGEST_END: Knowledge ingestion completed.
+        KNOWLEDGE_SEARCH_START: Knowledge search starting.
+        KNOWLEDGE_SEARCH_END: Knowledge search completed with results.
+        KNOWLEDGE_SYNC: Knowledge store sync triggered.
+        KNOWLEDGE_SOURCE_ADDED: Document source added to knowledge.
+        KNOWLEDGE_SOURCE_REMOVED: Document source removed from knowledge.
+        KNOWLEDGE_AGENTIC_DECOMPOSE: Agentic RAG decomposed query into sub-questions.
+        KNOWLEDGE_AGENTIC_GRADE: Agentic RAG graded retrieved chunks for relevance.
+        KNOWLEDGE_AGENTIC_REFINE: Agentic RAG refined query for better retrieval.
+        KNOWLEDGE_AGENTIC_VERIFY: Agentic RAG verified final answer.
+        CHECKPOINT_SAVE: Agent state checkpointed to storage.
+        CHECKPOINT_LOAD: Agent state restored from checkpoint.
+        REMOTE_CONFIG_UPDATE: Remote configuration updated successfully.
+        REMOTE_CONFIG_ERROR: Remote configuration update failed.
+        CONTEXT_COMPRESS: Context window compressed (summarization).
+        CONTEXT_COMPACT: Context window compacted (truncation).
+        CONTEXT_THRESHOLD: Context token threshold crossed.
+        CONTEXT_SNAPSHOT: Context snapshot taken for offload.
+        CONTEXT_OFFLOAD: Context offloaded to persistent memory.
+        CONTEXT_RESTORE: Context restored from persistent memory.
+        RATELIMIT_CHECK: Rate limit status checked.
+        RATELIMIT_THRESHOLD: Rate limit threshold crossed.
+        RATELIMIT_EXCEEDED: Rate limit hard cap exceeded.
+        OUTPUT_VALIDATION_START: Structured output validation starting.
+        OUTPUT_VALIDATION_ATTEMPT: Validation attempt (may retry on failure).
+        OUTPUT_VALIDATION_SUCCESS: Validation succeeded; parsed output ready.
+        OUTPUT_VALIDATION_FAILED: All validation attempts exhausted.
+        OUTPUT_VALIDATION_RETRY: Validation failed; scheduling retry.
+        HARNESS_SESSION_START: Evaluation harness session started.
+        HARNESS_SESSION_END: Evaluation harness session completed.
+        HARNESS_PROGRESS: Evaluation harness progress update.
+        HARNESS_CIRCUIT_TRIP: Evaluation harness circuit breaker tripped.
+        HARNESS_CIRCUIT_RESET: Evaluation harness circuit breaker reset.
+        HARNESS_RETRY: Evaluation harness retrying a failed case.
+        CIRCUIT_TRIP: Agent circuit breaker tripped (too many errors).
+        CIRCUIT_RESET: Agent circuit breaker reset to closed state.
+        HITL_PENDING: Human-in-the-loop approval pending.
+        HITL_APPROVED: Human-in-the-loop request approved.
+        HITL_REJECTED: Human-in-the-loop request rejected.
+        SYSTEM_PROMPT_BEFORE_RESOLVE: Before dynamic system prompt resolution.
+        SYSTEM_PROMPT_AFTER_RESOLVE: After system prompt resolved to final string.
+        DYNAMIC_PIPELINE_START: Dynamic pipeline execution started.
+        DYNAMIC_PIPELINE_PLAN: Dynamic pipeline plan generated by LLM.
+        DYNAMIC_PIPELINE_EXECUTE: Dynamic pipeline step executing.
+        DYNAMIC_PIPELINE_AGENT_SPAWN: Dynamic pipeline spawned an agent.
+        DYNAMIC_PIPELINE_AGENT_COMPLETE: Dynamic pipeline agent step completed.
+        DYNAMIC_PIPELINE_END: Dynamic pipeline execution finished.
+        DYNAMIC_PIPELINE_ERROR: Dynamic pipeline encountered an error.
+        PIPELINE_START: Static pipeline execution started.
+        PIPELINE_END: Static pipeline execution completed.
+        PIPELINE_AGENT_START: Static pipeline agent step started.
+        PIPELINE_AGENT_COMPLETE: Static pipeline agent step completed.
+    """
+
+    # — Agent lifecycle —
     AGENT_INIT = "agent.init"
     AGENT_RUN_START = "agent.run.start"
     AGENT_RUN_END = "agent.run.end"
     AGENT_RESET = "agent.reset"
 
+    # — Serve / A2A —
     SERVE_REQUEST_START = "serve.request.start"
     SERVE_REQUEST_END = "serve.request.end"
     DISCOVERY_REQUEST = "discovery.request"
 
+    # — MCP —
     MCP_CONNECTED = "mcp.connected"
     MCP_DISCONNECTED = "mcp.disconnected"
     MCP_TOOL_CALL_START = "mcp.tool.call.start"
     MCP_TOOL_CALL_END = "mcp.tool.call.end"
 
+    # — LLM —
     LLM_REQUEST_START = "llm.request.start"
     LLM_REQUEST_END = "llm.request.end"
     LLM_STREAM_CHUNK = "llm.stream.chunk"
     LLM_RETRY = "llm.retry"
     LLM_FALLBACK = "llm.fallback"
 
+    # — Tools —
     TOOL_CALL_START = "tool.call.start"
     TOOL_CALL_END = "tool.call.end"
     TOOL_ERROR = "tool.error"
 
+    # — Budget —
     BUDGET_CHECK = "budget.check"
     BUDGET_THRESHOLD = "budget.threshold"
     BUDGET_EXCEEDED = "budget.exceeded"
 
+    # — Model routing —
     MODEL_SWITCH = "model.switch"
-
     ROUTING_DECISION = "routing.decision"
 
+    # — Media generation —
     GENERATION_IMAGE_START = "generation.image.start"
     GENERATION_IMAGE_END = "generation.image.end"
     GENERATION_IMAGE_ERROR = "generation.image.error"
@@ -375,22 +516,26 @@ class Hook(StrEnum):
     GENERATION_VOICE_END = "generation.voice.end"
     GENERATION_VOICE_ERROR = "generation.voice.error"
 
+    # — Handoff & spawn —
     HANDOFF_START = "handoff.start"
     HANDOFF_END = "handoff.end"
     HANDOFF_BLOCKED = "handoff.blocked"
     SPAWN_START = "spawn.start"
     SPAWN_END = "spawn.end"
 
+    # — Guardrails —
     GUARDRAIL_INPUT = "guardrail.input"
     GUARDRAIL_OUTPUT = "guardrail.output"
     GUARDRAIL_BLOCKED = "guardrail.blocked"
 
+    # — Memory —
     MEMORY_RECALL = "memory.recall"
     MEMORY_STORE = "memory.store"
     MEMORY_FORGET = "memory.forget"
     MEMORY_CONSOLIDATE = "memory.consolidate"
     MEMORY_EXTRACT = "memory.extract"
 
+    # — Knowledge / RAG —
     KNOWLEDGE_INGEST_START = "knowledge.ingest.start"
     KNOWLEDGE_INGEST_END = "knowledge.ingest.end"
     KNOWLEDGE_SEARCH_START = "knowledge.search.start"
@@ -399,18 +544,21 @@ class Hook(StrEnum):
     KNOWLEDGE_SOURCE_ADDED = "knowledge.source.added"
     KNOWLEDGE_SOURCE_REMOVED = "knowledge.source.removed"
 
-    # Agentic RAG (Step 6)
+    # — Agentic RAG —
     KNOWLEDGE_AGENTIC_DECOMPOSE = "knowledge.agentic.decompose"
     KNOWLEDGE_AGENTIC_GRADE = "knowledge.agentic.grade"
     KNOWLEDGE_AGENTIC_REFINE = "knowledge.agentic.refine"
     KNOWLEDGE_AGENTIC_VERIFY = "knowledge.agentic.verify"
 
+    # — Checkpoint —
     CHECKPOINT_SAVE = "checkpoint.save"
     CHECKPOINT_LOAD = "checkpoint.load"
 
+    # — Remote config —
     REMOTE_CONFIG_UPDATE = "remote.config.update"
     REMOTE_CONFIG_ERROR = "remote.config.error"
 
+    # — Context management —
     CONTEXT_COMPRESS = "context.compress"
     CONTEXT_COMPACT = "context.compact"
     CONTEXT_THRESHOLD = "context.threshold"
@@ -418,32 +566,40 @@ class Hook(StrEnum):
     CONTEXT_OFFLOAD = "context.offload"
     CONTEXT_RESTORE = "context.restore"
 
+    # — Rate limiting —
     RATELIMIT_CHECK = "ratelimit.check"
     RATELIMIT_THRESHOLD = "ratelimit.threshold"
     RATELIMIT_EXCEEDED = "ratelimit.exceeded"
 
+    # — Output validation —
     OUTPUT_VALIDATION_START = "output.validation.start"
     OUTPUT_VALIDATION_ATTEMPT = "output.validation.attempt"
     OUTPUT_VALIDATION_SUCCESS = "output.validation.success"
     OUTPUT_VALIDATION_FAILED = "output.validation.failed"
     OUTPUT_VALIDATION_RETRY = "output.validation.retry"
 
+    # — Evaluation harness —
     HARNESS_SESSION_START = "harness.session.start"
     HARNESS_SESSION_END = "harness.session.end"
     HARNESS_PROGRESS = "harness.progress"
     HARNESS_CIRCUIT_TRIP = "harness.circuit.trip"
     HARNESS_CIRCUIT_RESET = "harness.circuit.reset"
+    HARNESS_RETRY = "harness.retry"
 
+    # — Circuit breaker —
     CIRCUIT_TRIP = "circuit.trip"
     CIRCUIT_RESET = "circuit.reset"
 
+    # — Human-in-the-loop —
     HITL_PENDING = "hitl.pending"
     HITL_APPROVED = "hitl.approved"
     HITL_REJECTED = "hitl.rejected"
 
+    # — System prompt —
     SYSTEM_PROMPT_BEFORE_RESOLVE = "system_prompt.before_resolve"
     SYSTEM_PROMPT_AFTER_RESOLVE = "system_prompt.after_resolve"
 
+    # — Dynamic pipeline —
     DYNAMIC_PIPELINE_START = "dynamic.pipeline.start"
     DYNAMIC_PIPELINE_PLAN = "dynamic.pipeline.plan"
     DYNAMIC_PIPELINE_EXECUTE = "dynamic.pipeline.execute"
@@ -451,9 +607,8 @@ class Hook(StrEnum):
     DYNAMIC_PIPELINE_AGENT_COMPLETE = "dynamic.pipeline.agent.complete"
     DYNAMIC_PIPELINE_END = "dynamic.pipeline.end"
     DYNAMIC_PIPELINE_ERROR = "dynamic.pipeline.error"
-    HARNESS_RETRY = "harness.retry"
 
-    # Static Pipeline (audit)
+    # — Static pipeline —
     PIPELINE_START = "pipeline.start"
     PIPELINE_END = "pipeline.end"
     PIPELINE_AGENT_START = "pipeline.agent.start"
@@ -631,9 +786,6 @@ class CheckpointStrategy(StrEnum):
     """How agent state is checkpointed for long-running tasks."""
 
     FULL = "full"
-    INCREMENTAL = "incremental"
-    EVENT_SOURCED = "event_sourced"
-    HYBRID = "hybrid"
 
 
 class CheckpointBackend(StrEnum):
@@ -643,15 +795,6 @@ class CheckpointBackend(StrEnum):
     SQLITE = "sqlite"
     POSTGRES = "postgres"
     FILESYSTEM = "filesystem"
-
-
-class OffloadBackend(StrEnum):
-    """Where to store offloaded context data."""
-
-    MEMORY = "memory"
-    FILESYSTEM = "filesystem"
-    SQLITE = "sqlite"
-    REDIS = "redis"
 
 
 class RetryBackoff(StrEnum):

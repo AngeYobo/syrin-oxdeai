@@ -13,9 +13,9 @@ DocumentMetadata: TypeAlias = dict[
 ]
 
 
-@dataclass(frozen=True)
+@dataclass
 class Document:
-    """Immutable loaded document with content, source identity, and optional metadata.
+    """Loaded document with content, source identity, and optional metadata.
 
     Documents are the fundamental unit of content in the Knowledge module.
     They are created by DocumentLoaders and later chunked for embedding.

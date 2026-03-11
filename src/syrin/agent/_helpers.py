@@ -645,7 +645,68 @@ def _resolve_memory(
 
 def _emit_domain_event_for_hook(hook: Hook, ctx: EventContext, bus: Any) -> None:
     """Emit domain events for hooks that have typed domain event equivalents."""
-    if hook == Hook.BUDGET_THRESHOLD:
+    if hook == Hook.AGENT_RUN_START:
+        from syrin.domain_events import AgentRunStarted
+
+        bus.emit(
+            AgentRunStarted(
+                input=cast(str, ctx.get("input", "")),
+                model=cast(str, ctx.get("model", "")),
+                iteration=cast(int, ctx.get("iteration", 0)),
+            )
+        )
+    elif hook == Hook.AGENT_RUN_END:
+        from syrin.domain_events import AgentRunEnded
+
+        bus.emit(
+            AgentRunEnded(
+                content=cast(str, ctx.get("content", "")),
+                cost=cast(float, ctx.get("cost", 0.0)),
+                tokens=cast(int, ctx.get("tokens", 0)),
+                duration=cast(float, ctx.get("duration", 0.0)),
+                stop_reason=cast(str, ctx.get("stop_reason", "")),
+                iteration=cast(int, ctx.get("iteration", 0)),
+            )
+        )
+    elif hook == Hook.LLM_REQUEST_START:
+        from syrin.domain_events import LLMRequestStarted
+
+        tools = ctx.get("tools", [])
+        bus.emit(
+            LLMRequestStarted(
+                iteration=cast(int, ctx.get("iteration", 0)),
+                tool_count=len(tools) if isinstance(tools, list) else 0,
+            )
+        )
+    elif hook == Hook.LLM_REQUEST_END:
+        from syrin.domain_events import LLMRequestCompleted
+
+        bus.emit(
+            LLMRequestCompleted(
+                content=cast(str, ctx.get("content", "")),
+                iteration=cast(int, ctx.get("iteration", 0)),
+            )
+        )
+    elif hook == Hook.TOOL_CALL_END:
+        from syrin.domain_events import ToolCallCompleted
+
+        bus.emit(
+            ToolCallCompleted(
+                tool_name=cast(str, ctx.get("tool_name", "")),
+                duration_ms=cast(float, ctx.get("duration_ms", 0.0)),
+            )
+        )
+    elif hook == Hook.TOOL_ERROR:
+        from syrin.domain_events import ToolCallFailed
+
+        bus.emit(
+            ToolCallFailed(
+                tool_name=cast(str, ctx.get("tool_name", "")),
+                error=cast(str, ctx.get("error", "")),
+                iteration=cast(int, ctx.get("iteration", 0)),
+            )
+        )
+    elif hook == Hook.BUDGET_THRESHOLD:
         from syrin.domain_events import BudgetThresholdReached
 
         pct = cast(int, ctx.get("threshold_percent", 0))
@@ -653,6 +714,41 @@ def _emit_domain_event_for_hook(hook: Hook, ctx: EventContext, bus: Any) -> None
         limit = cast(float, ctx.get("limit_value", 0.0))
         metric = cast(str, ctx.get("metric", "cost"))
         bus.emit(BudgetThresholdReached(pct, current, limit, metric))
+    elif hook == Hook.BUDGET_EXCEEDED:
+        from syrin.domain_events import BudgetExceeded
+
+        used = cast(float, ctx.get("used", 0.0))
+        limit = cast(float, ctx.get("limit", 0.0))
+        bus.emit(BudgetExceeded(used=used, limit=limit, exceeded_by=used - limit))
+    elif hook == Hook.GUARDRAIL_BLOCKED:
+        from syrin.domain_events import GuardrailBlocked
+
+        names = ctx.get("guardrail_names", [])
+        bus.emit(
+            GuardrailBlocked(
+                stage=cast(str, ctx.get("stage", "")),
+                reason=cast(str, ctx.get("reason", "")),
+                guardrail_names=list(names) if isinstance(names, list) else [],
+            )
+        )
+    elif hook == Hook.HANDOFF_START:
+        from syrin.domain_events import HandoffStarted
+
+        bus.emit(
+            HandoffStarted(
+                target_agent=cast(str, ctx.get("target_agent", "")),
+                task=cast(str, ctx.get("task", "")),
+            )
+        )
+    elif hook == Hook.HANDOFF_END:
+        from syrin.domain_events import HandoffCompleted
+
+        bus.emit(
+            HandoffCompleted(
+                target_agent=cast(str, ctx.get("target_agent", "")),
+                success=bool(ctx.get("success", True)),
+            )
+        )
     elif hook == Hook.CONTEXT_COMPACT:
         from syrin.domain_events import ContextCompacted
 

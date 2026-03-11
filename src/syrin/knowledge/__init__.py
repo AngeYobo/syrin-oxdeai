@@ -299,7 +299,11 @@ class Knowledge:
         if loader in self._sources:
             self._sources.remove(loader)
             self._emit_hook(Hook.KNOWLEDGE_SOURCE_REMOVED, {"source_count": len(self._sources)})
-        docs = loader.load()
+        if hasattr(loader, "aload") and callable(loader.aload):
+            docs = await loader.aload()
+        else:
+            loop = asyncio.get_event_loop()
+            docs = await loop.run_in_executor(None, loader.load)
         for doc in docs:
             await self._store.delete(document_id=doc.source)
             self._document_ids.discard(doc.source)

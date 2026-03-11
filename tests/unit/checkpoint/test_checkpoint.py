@@ -515,11 +515,6 @@ class TestEdgeCases:
 class TestCheckpointerWithStrategy:
     """Tests for Checkpointer with different strategies."""
 
-    def test_incremental_strategy(self):
-        """Test checkpointer with incremental strategy."""
-        checkpointer = Checkpointer(strategy=CheckpointStrategy.INCREMENTAL)
-        assert checkpointer._strategy == CheckpointStrategy.INCREMENTAL
-
     def test_full_strategy(self):
         """Test checkpointer with full strategy."""
         checkpointer = Checkpointer(strategy=CheckpointStrategy.FULL)

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from syrin.knowledge._chunker import Chunk
 from syrin.knowledge._store import MetadataFilter, SearchResult, chunk_id
+from syrin.knowledge.stores._metadata import serialize_metadata_value
 
 if TYPE_CHECKING:
     pass
@@ -37,13 +38,7 @@ if _POSTGRES_AVAILABLE:
 _TABLE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
-def _json_serializable(obj: object) -> object:
-    """Convert to JSON-serializable form (handles list[str] etc)."""
-    if isinstance(obj, list):
-        return [_json_serializable(x) for x in obj]
-    if isinstance(obj, (str, int, float, bool, type(None))):
-        return obj
-    return str(obj)
+_json_serializable = serialize_metadata_value
 
 
 class PostgresKnowledgeStore:

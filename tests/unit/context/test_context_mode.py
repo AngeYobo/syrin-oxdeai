@@ -246,22 +246,3 @@ class TestContextModeFocused:
         assert "q1" not in contents
 
 
-class TestContextModeIntelligent:
-    """context_mode=intelligent: raises NotImplementedError."""
-
-    def test_intelligent_raises_not_implemented(self) -> None:
-        manager = DefaultContextManager(
-            context=Context(
-                max_tokens=16000,
-                context_mode=ContextMode.INTELLIGENT,
-            )
-        )
-        messages = [_msg("user", "hello")]
-        capacity = ContextWindowCapacity(max_tokens=16000)
-        with pytest.raises(NotImplementedError, match="intelligent.*relevance"):
-            manager.prepare(
-                messages=messages,
-                system_prompt="",
-                tools=[],
-                capacity=capacity,
-            )

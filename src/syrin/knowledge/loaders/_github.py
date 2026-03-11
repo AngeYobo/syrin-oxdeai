@@ -139,18 +139,28 @@ class GitHubLoader:
         return None
 
     async def _fetch_user_repos(self) -> list[Document]:
-        """Fetch list of user's repositories."""
+        """Fetch list of user's repositories (paginated, up to 500)."""
         headers = self._get_headers()
-        url = f"https://api.github.com/users/{self._username}/repos?per_page=100"
+        repos: list[dict[str, object]] = []
+        page = 1
+        max_repos = 500
 
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
-            repos = response.json()
+            while len(repos) < max_repos:
+                url = f"https://api.github.com/users/{self._username}/repos?per_page=100&page={page}"
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+                batch = response.json()
+                if not batch:
+                    break
+                repos.extend(batch)
+                if len(batch) < 100:
+                    break
+                page += 1
 
         content_parts = [f"# Repositories for {self._username}\n"]
 
-        for repo in repos[:50]:  # Limit to 50 repos
+        for repo in repos:
             content_parts.append(
                 f"## {repo['name']}\n"
                 f"Description: {repo.get('description', 'No description')}\n"
@@ -173,7 +183,7 @@ class GitHubLoader:
         headers: dict[str, str] = {
             "Accept": "application/vnd.github.v3+json",
         }
-        if self._token:
+        if self._token and self._token.strip():
             headers["Authorization"] = f"token {self._token}"
         return headers
 

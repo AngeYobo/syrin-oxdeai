@@ -133,8 +133,3 @@ class Chunker(Protocol):
             List of Chunks, order preserved per document.
         """
         ...
-
-
-def _estimate_tokens(text: str) -> int:
-    """Estimate token count (same heuristic as router: ~4 chars per token)."""
-    return max(1, len(text) // 4)

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import TYPE_CHECKING
 
 from syrin.knowledge._chunker import Chunk
 from syrin.knowledge._store import MetadataFilter, SearchResult, chunk_id
+from syrin.knowledge.stores._metadata import metadata_from_flat, metadata_to_flat
 
 if TYPE_CHECKING:
     pass
@@ -25,6 +25,9 @@ except ImportError:
     Settings = None
 
 
+_CHROMA_SKIP_KEYS = {"document_id", "chunk_index", "token_count", "source"}
+
+
 def _chunk_to_metadata(chunk: Chunk) -> dict[str, str | int | float | bool]:
     """Convert chunk metadata to Chroma-compatible (str, int, float, bool only)."""
     out: dict[str, str | int | float | bool] = {
@@ -33,15 +36,7 @@ def _chunk_to_metadata(chunk: Chunk) -> dict[str, str | int | float | bool]:
         "token_count": chunk.token_count,
         "source": chunk.document_id,
     }
-    for k, v in chunk.metadata.items():
-        if v is None:
-            continue
-        if isinstance(v, (str, int, float, bool)):
-            out[k] = v
-        elif isinstance(v, list):
-            out[k] = json.dumps(v)
-        else:
-            out[k] = str(v)
+    out.update(metadata_to_flat(chunk.metadata))
     return out
 
 
@@ -50,18 +45,7 @@ def _chunk_from_metadata(
     metadata: dict[str, object],
 ) -> Chunk:
     """Reconstruct Chunk from Chroma document and metadata."""
-    meta: dict[str, str | int | float | bool | None | list[str]] = {}
-    skip = {"document_id", "chunk_index", "token_count", "source"}
-    for k, v in metadata.items():
-        if k in skip:
-            continue
-        if isinstance(v, str) and v.startswith("["):
-            try:
-                meta[k] = json.loads(v)
-            except json.JSONDecodeError:
-                meta[k] = v
-        elif isinstance(v, (str, int, float, bool, type(None))):
-            meta[k] = v
+    meta = metadata_from_flat(metadata, _CHROMA_SKIP_KEYS)
     return Chunk(
         content=content,
         metadata=meta,

@@ -93,6 +93,9 @@ _auto_trace_check()
 
 del _auto_trace_check
 
+# =============================================================================
+# Core
+# =============================================================================
 from syrin.agent import Agent
 from syrin.agent.config import AgentConfig
 from syrin.agent.multi_agent import (
@@ -103,17 +106,12 @@ from syrin.agent.multi_agent import (
     parallel,
     sequential,
 )
-from syrin.audit import (
-    AuditBackendProtocol,
-    AuditEntry,
-    AuditFilters,
-    AuditLog,
-    JsonlAuditBackend,
-)
+
+# =============================================================================
+# Budget
+# =============================================================================
 from syrin.budget import (
     Budget,
-    BudgetExceededContext,
-    BudgetLimitType,
     BudgetState,
     BudgetThreshold,
     RateLimit,
@@ -124,7 +122,10 @@ from syrin.budget import (
     warn_on_exceeded,
 )
 from syrin.budget_store import BudgetStore, FileBudgetStore, InMemoryBudgetStore
-from syrin.capabilities import InputFileRules
+
+# =============================================================================
+# Checkpoint
+# =============================================================================
 from syrin.checkpoint import (
     CheckpointConfig,
     Checkpointer,
@@ -134,44 +135,30 @@ from syrin.checkpoint import (
 from syrin.circuit import CircuitBreaker
 
 # =============================================================================
-# CLI & Observability (New)
+# Audit
 # =============================================================================
-from syrin.cli import (
-    WorkflowDebugger,
-    auto_trace,
-    check_for_trace_flag,
-    remove_trace_flag,
-)
+from syrin.audit import AuditLog
+
+# =============================================================================
+# Config
+# =============================================================================
 from syrin.config import configure, get_config
-from syrin.context import (
-    Context,
-    ContextConfig,
-    ContextManager,
-    ContextStats,
-    DefaultContextManager,
-    TokenCounter,
-)
-from syrin.domain_events import (
-    BudgetThresholdReached,
-    ContextCompacted,
-    DomainEvent,
-    EventBus,
-)
+
+# =============================================================================
+# Context
+# =============================================================================
+from syrin.context import Context, ContextConfig, ContextStats
+
+# =============================================================================
+# Enums (only high-frequency user-facing ones)
+# =============================================================================
 from syrin.enums import (
     AlmockPricing,
-    AuditBackend,
-    AuditEventType,
-    CheckpointBackend,
     CheckpointStrategy,
-    CircuitState,
     ContextMode,
-    ContextStrategy,
     DecayStrategy,
-    DocFormat,
-    FormationMode,
     GuardrailStage,
     Hook,
-    InjectionStrategy,
     KnowledgeBackend,
     LoopStrategy,
     Media,
@@ -180,22 +167,14 @@ from syrin.enums import (
     MemoryScope,
     MemoryType,
     MessageRole,
-    OffloadBackend,
-    OutputChunkStrategy,
-    ProgressStatus,
-    RateWindow,
-    RetryBackoff,
-    SandboxRuntime,
-    ServeProtocol,
-    StepType,
     StopReason,
-    SwitchReason,
-    ThresholdMetric,
-    ThresholdWindow,
-    TraceLevel,
-    TracingBackend,
+    VoiceOutputFormat,
 )
 from syrin.events import EventContext, Events
+
+# =============================================================================
+# Exceptions
+# =============================================================================
 from syrin.exceptions import (
     CircuitBreakerOpenError,
     HandoffBlockedError,
@@ -204,22 +183,24 @@ from syrin.exceptions import (
     NoMatchingProfileError,
     ValidationError,
 )
+
+# =============================================================================
+# Generation (Image, Video, Voice)
+# =============================================================================
 from syrin.generation import (
     AspectRatio,
-    DalleImageProvider,
-    GeminiImageProvider,
-    GeminiVideoProvider,
     GenerationResult,
     ImageGenerator,
     OutputMimeType,
     VideoGenerator,
     VoiceGenerator,
-    VoiceOutputFormat,
     generate_image,
     generate_video,
-    get_default_image_generator,
-    get_default_video_generator,
 )
+
+# =============================================================================
+# Guardrails
+# =============================================================================
 from syrin.guardrails import (
     ContentFilter,
     Guardrail,
@@ -227,7 +208,15 @@ from syrin.guardrails import (
     GuardrailResult,
     LengthGuardrail,
 )
+
+# =============================================================================
+# HITL
+# =============================================================================
 from syrin.hitl import ApprovalGate, ApprovalGateProtocol
+
+# =============================================================================
+# Knowledge
+# =============================================================================
 from syrin.knowledge import (
     AgenticRAGConfig,
     Chunk,
@@ -235,10 +224,10 @@ from syrin.knowledge import (
     DocumentLoader,
     Knowledge,
 )
-from syrin.knowledge.stores import (
-    InMemoryKnowledgeStore,
-    get_knowledge_store,
-)
+
+# =============================================================================
+# Loop
+# =============================================================================
 from syrin.loop import (
     HITL,
     REACT,
@@ -252,7 +241,15 @@ from syrin.loop import (
     SingleShotLoop,
     ToolApprovalFn,
 )
+
+# =============================================================================
+# MCP
+# =============================================================================
 from syrin.mcp import MCP, MCPClient
+
+# =============================================================================
+# Memory
+# =============================================================================
 from syrin.memory import (
     Decay,
     Memory,
@@ -261,37 +258,28 @@ from syrin.memory import (
 )
 
 # =============================================================================
-# Model - Core
-# =============================================================================
-# =============================================================================
-# Model - Structured Output
-# =============================================================================
-# =============================================================================
-# Model - Provider Namespaces
+# Model
 # =============================================================================
 from syrin.model import (
     Anthropic,
     Google,
     LiteLLM,
     Middleware,
-    # Core
     Model,
     ModelRegistry,
     ModelSettings,
     ModelVariable,
     ModelVersion,
     Ollama,
-    # Provider namespaces
     OpenAI,
     OutputType,
-    # Structured output
     StructuredOutput,
     output,
     structured,
 )
 
 # =============================================================================
-# Observability (New)
+# Observability
 # =============================================================================
 from syrin.observability import (
     ConsoleExporter,
@@ -314,62 +302,38 @@ from syrin.observability import (
 from syrin.observability import (
     get_tracer as get_observability_tracer,
 )
+
+# =============================================================================
+# Output & Validation
+# =============================================================================
 from syrin.output import Output
-from syrin.pipe import Pipe, pipe
+
+# =============================================================================
+# Prompt
+# =============================================================================
 from syrin.prompt import (
     Prompt,
     PromptContext,
-    make_prompt_context,
     prompt,
     system_prompt,
     validated,
 )
-from syrin.remote import init
+
+# =============================================================================
+# Response
+# =============================================================================
 from syrin.response import (
-    AgentReport,
-    BudgetStatus,
-    CheckpointReport,
-    ContextReport,
-    GuardrailReport,
     MediaAttachment,
-    MemoryReport,
-    OutputReport,
-    RateLimitReport,
     Response,
-    TokenReport,
 )
-from syrin.router import (
-    ClassificationResult,
-    ComplexityTier,
-    EmbeddingClassifier,
-    ModalityDetector,
-    ModelRouter,
-    PromptClassifier,
-    RoutingConfig,
-    RoutingMode,
-    RoutingReason,
-    TaskType,
-    get_default_profiles,
-)
+
+# =============================================================================
+# Run Context, Task, Tool
+# =============================================================================
 from syrin.run_context import RunContext
-from syrin.serve import (
-    AgentCard,
-    AgentCardAuth,
-    AgentCardProvider,
-    AgentRouter,
-    ServeConfig,
-    build_agent_card_json,
-    build_router,
-)
+from syrin.serve import ServeConfig
 from syrin.task import task
-from syrin.threshold import (
-    ContextThreshold,
-    RateLimitThreshold,
-    ThresholdContext,
-    compact_if_available,
-)
 from syrin.tool import ToolSpec, tool
-from syrin.validation import ValidationPipeline, validate_output
 
 
 def _get_version() -> str:
@@ -464,12 +428,12 @@ __all__ = [
     "__version__",
     "Agent",
     "AgentConfig",
+    "AuditLog",
     "run",
     "configure",
     "get_config",
-    "init",
     # =============================================================================
-    # Model - Core
+    # Model
     # =============================================================================
     "Model",
     "ModelRegistry",
@@ -477,44 +441,34 @@ __all__ = [
     "ModelVariable",
     "ModelVersion",
     "Middleware",
-    # =============================================================================
-    # Model - Structured Output
-    # =============================================================================
-    "StructuredOutput",
-    "structured",
-    "OutputType",
-    "output",
-    # =============================================================================
-    # Model - Provider Namespaces
-    # =============================================================================
     "OpenAI",
     "Anthropic",
     "Ollama",
     "Google",
     "LiteLLM",
     # =============================================================================
+    # Structured Output
+    # =============================================================================
+    "StructuredOutput",
+    "structured",
+    "OutputType",
+    "output",
+    "Output",
+    # =============================================================================
     # Budget
     # =============================================================================
     "Budget",
-    "BudgetExceededContext",
     "BudgetState",
+    "BudgetThreshold",
     "RateLimit",
     "TokenLimits",
     "TokenRateLimit",
-    "BudgetThreshold",
     "raise_on_exceeded",
     "stop_on_exceeded",
     "warn_on_exceeded",
     "BudgetStore",
     "InMemoryBudgetStore",
     "FileBudgetStore",
-    # =============================================================================
-    # Threshold
-    # =============================================================================
-    "ThresholdContext",
-    "ContextThreshold",
-    "compact_if_available",
-    "RateLimitThreshold",
     # =============================================================================
     # Memory
     # =============================================================================
@@ -525,169 +479,59 @@ __all__ = [
     # =============================================================================
     # Knowledge
     # =============================================================================
-    "AgenticRAGConfig",
     "Knowledge",
+    "AgenticRAGConfig",
     "Chunk",
     "Document",
     "DocumentLoader",
-    "InMemoryKnowledgeStore",
-    "get_knowledge_store",
-    "KnowledgeBackend",
+    # =============================================================================
     # Context
     # =============================================================================
     "Context",
-    "ContextConfig",
     "ContextStats",
-    "ContextManager",
-    "DefaultContextManager",
-    "TokenCounter",
     # =============================================================================
-    # Pipeline
+    # Generation
     # =============================================================================
-    "Pipe",
-    "pipe",
-    "ClassificationResult",
-    "ComplexityTier",
-    "Media",
-    "ModalityDetector",
-    "ModelRouter",
-    "PromptClassifier",
-    "EmbeddingClassifier",
-    "RoutingConfig",
-    "RoutingMode",
-    "RoutingReason",
-    "TaskType",
-    "get_default_profiles",
-    "prompt",
-    "system_prompt",
-    "validated",
-    "Prompt",
-    "PromptContext",
-    "make_prompt_context",
-    "MediaAttachment",
-    "Response",
-    "AspectRatio",
-    "DalleImageProvider",
-    "GenerationResult",
-    "GeminiImageProvider",
-    "GeminiVideoProvider",
     "ImageGenerator",
-    "OutputMimeType",
     "VideoGenerator",
     "VoiceGenerator",
-    "VoiceOutputFormat",
+    "GenerationResult",
+    "AspectRatio",
+    "OutputMimeType",
     "generate_image",
     "generate_video",
-    "get_default_image_generator",
-    "get_default_video_generator",
-    "Output",
-    "ValidationPipeline",
-    "validate_output",
-    "ValidationError",
-    "ApprovalGate",
-    "ApprovalGateProtocol",
-    "InputFileRules",
-    "CircuitBreaker",
-    "CircuitBreakerOpenError",
-    "HandoffBlockedError",
-    "HandoffRetryRequested",
-    "ModalityNotSupportedError",
-    "NoMatchingProfileError",
-    "Pipeline",
-    "PipelineRun",
-    "AgentTeam",
-    "DynamicPipeline",
-    "parallel",
-    "sequential",
     # =============================================================================
-    # Reports
+    # Guardrails
     # =============================================================================
-    "AgentReport",
-    "GuardrailReport",
-    "ContextReport",
-    "MemoryReport",
-    "TokenReport",
-    "OutputReport",
-    "RateLimitReport",
-    "CheckpointReport",
-    "BudgetStatus",
+    "Guardrail",
+    "GuardrailChain",
+    "GuardrailResult",
+    "ContentFilter",
+    "LengthGuardrail",
     # =============================================================================
-    # Tool & Task
+    # Tools & Task
     # =============================================================================
     "tool",
     "ToolSpec",
     "task",
     "RunContext",
-    "ServeConfig",
-    "AgentCard",
-    "AgentCardAuth",
-    "AgentCardProvider",
-    "AgentRouter",
-    "build_agent_card_json",
-    "build_router",
-    "MCP",
-    "MCPClient",
     # =============================================================================
-    # Enums
+    # Prompt
     # =============================================================================
-    "StopReason",
-    "LoopStrategy",
-    "ContextMode",
-    "ContextStrategy",
-    "FormationMode",
-    "OutputChunkStrategy",
-    "TracingBackend",
-    "TraceLevel",
-    "MessageRole",
-    "StepType",
-    "GuardrailStage",
-    "SwitchReason",
-    "RateWindow",
-    "AlmockPricing",
-    "AuditBackend",
-    "AuditBackendProtocol",
-    "AuditEntry",
-    "AuditEventType",
-    "AuditFilters",
-    "AuditLog",
-    "JsonlAuditBackend",
-    "SandboxRuntime",
-    "ServeProtocol",
-    "Hook",
-    "DocFormat",
-    "MemoryType",
-    "MemoryPreset",
-    "MemoryBackend",
-    "MemoryScope",
-    "DecayStrategy",
-    "InjectionStrategy",
-    "CheckpointStrategy",
-    "CheckpointBackend",
-    "CheckpointTrigger",
-    "OffloadBackend",
-    "RetryBackoff",
-    "CircuitState",
-    "ProgressStatus",
-    "BudgetLimitType",
-    "ThresholdMetric",
-    "ThresholdWindow",
-    "Events",
-    "EventContext",
-    # Loop
-    "Loop",
-    "LoopResult",
-    "ReactLoop",
-    "SingleShotLoop",
-    "HumanInTheLoop",
-    "PlanExecuteLoop",
-    "CodeActionLoop",
-    "ToolApprovalFn",
-    "REACT",
-    "SINGLE_SHOT",
-    "HITL",
+    "Prompt",
+    "PromptContext",
+    "prompt",
+    "system_prompt",
+    "validated",
+    # =============================================================================
+    # Response
+    # =============================================================================
+    "Response",
+    "MediaAttachment",
     # =============================================================================
     # Observability
     # =============================================================================
+    "Hook",
     "Span",
     "SpanKind",
     "SpanStatus",
@@ -706,22 +550,84 @@ __all__ = [
     "set_debug",
     "get_observability_tracer",
     # =============================================================================
-    # CLI & Observability Helpers
+    # Pipeline & Multi-Agent
     # =============================================================================
-    "WorkflowDebugger",
-    "auto_trace",
-    "check_for_trace_flag",
-    "remove_trace_flag",
+    "Pipeline",
+    "PipelineRun",
+    "AgentTeam",
+    "DynamicPipeline",
+    "parallel",
+    "sequential",
+    # =============================================================================
+    # Loop
+    # =============================================================================
+    "Loop",
+    "LoopResult",
+    "ReactLoop",
+    "SingleShotLoop",
+    "HumanInTheLoop",
+    "PlanExecuteLoop",
+    "CodeActionLoop",
+    "ToolApprovalFn",
+    "REACT",
+    "SINGLE_SHOT",
+    "HITL",
+    # =============================================================================
+    # HITL
+    # =============================================================================
+    "ApprovalGate",
+    "ApprovalGateProtocol",
+    # =============================================================================
+    # Checkpoint
+    # =============================================================================
     "Checkpointer",
     "CheckpointConfig",
     "CheckpointState",
-    "BudgetThresholdReached",
-    "ContextCompacted",
-    "DomainEvent",
-    "EventBus",
-    "ContentFilter",
-    "Guardrail",
-    "GuardrailChain",
-    "GuardrailResult",
-    "LengthGuardrail",
+    "CheckpointTrigger",
+    # =============================================================================
+    # Circuit Breaker
+    # =============================================================================
+    "CircuitBreaker",
+    # =============================================================================
+    # MCP
+    # =============================================================================
+    "MCP",
+    "MCPClient",
+    # =============================================================================
+    # Serve
+    # =============================================================================
+    "ServeConfig",
+    # =============================================================================
+    # Events
+    # =============================================================================
+    "Events",
+    "EventContext",
+    # =============================================================================
+    # Enums (high-frequency, user-facing only)
+    # All enums remain accessible via `from syrin.enums import ...`
+    # =============================================================================
+    "StopReason",
+    "LoopStrategy",
+    "ContextMode",
+    "Media",
+    "MemoryType",
+    "MemoryBackend",
+    "MemoryPreset",
+    "MemoryScope",
+    "KnowledgeBackend",
+    "DecayStrategy",
+    "GuardrailStage",
+    "MessageRole",
+    "AlmockPricing",
+    "CheckpointStrategy",
+    "VoiceOutputFormat",
+    # =============================================================================
+    # Exceptions
+    # =============================================================================
+    "ValidationError",
+    "CircuitBreakerOpenError",
+    "HandoffBlockedError",
+    "HandoffRetryRequested",
+    "ModalityNotSupportedError",
+    "NoMatchingProfileError",
 ]

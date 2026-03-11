@@ -8,6 +8,7 @@ from pathlib import Path
 
 from syrin.knowledge._chunker import Chunk
 from syrin.knowledge._store import MetadataFilter, SearchResult, chunk_id
+from syrin.knowledge.stores._metadata import serialize_metadata_value
 
 _SQLITE_VEC_AVAILABLE = False
 sqlite_vec: object = None
@@ -21,12 +22,7 @@ except ImportError:
     sqlite_vec = None
 
 
-def _json_serializable(obj: object) -> object:
-    if isinstance(obj, list):
-        return [_json_serializable(x) for x in obj]
-    if isinstance(obj, (str, int, float, bool, type(None))):
-        return obj
-    return str(obj)
+_json_serializable = serialize_metadata_value
 
 
 class SQLiteKnowledgeStore:

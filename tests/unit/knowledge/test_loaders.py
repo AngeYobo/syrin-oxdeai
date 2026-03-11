@@ -42,8 +42,8 @@ class TestDocument:
         assert doc.metadata["page"] == 1
         assert doc.metadata["total_pages"] == 5
 
-    def test_document_is_immutable(self) -> None:
-        """Document is frozen (immutable)."""
+    def test_document_is_mutable(self) -> None:
+        """Document is mutable (can be updated)."""
         from syrin.knowledge import Document
 
         doc = Document(
@@ -51,10 +51,13 @@ class TestDocument:
             source="test.txt",
             source_type="text",
         )
-        with pytest.raises(AttributeError):
-            doc.content = "Updated"
-        with pytest.raises(AttributeError):
-            doc.source = "other.txt"
+        # Should not raise - Documents are mutable
+        doc.content = "Updated"
+        doc.source = "other.txt"
+        doc.metadata["key"] = "value"
+        assert doc.content == "Updated"
+        assert doc.source == "other.txt"
+        assert doc.metadata["key"] == "value"
 
     def test_document_empty_source_raises(self) -> None:
         """Document raises if source is empty."""

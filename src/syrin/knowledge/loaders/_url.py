@@ -95,6 +95,7 @@ class URLLoader:
         Returns:
             Plain text content.
         """
+        import html as html_module
         import re
 
         # Remove script and style elements
@@ -108,16 +109,10 @@ class URLLoader:
         # Remove all remaining tags
         text = re.sub(r"<[^>]+>", "", html)
 
-        # Decode HTML entities
-        text = text.replace("&nbsp;", " ")
-        text = text.replace("&amp;", "&")
-        text = text.replace("&lt;", "<")
-        text = text.replace("&gt;", ">")
-        text = text.replace("&quot;", '"')
+        # Decode all HTML entities (handles &nbsp; &amp; &lt; &gt; &quot; &#39; &#x27; etc.)
+        text = html_module.unescape(text)
 
         # Clean up whitespace
-        import re
-
         text = re.sub(r"\n\n+", "\n\n", text)
         text = re.sub(r" +", " ", text)
         text = text.strip()

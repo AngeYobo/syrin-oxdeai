@@ -47,7 +47,7 @@ def test_no_agent_import_in_bottom_mid_modules() -> None:
     # Bottom: enums, exceptions, types, domain_events, config
     # Mid: cost, budget, budget_store, threshold, events, response, prompt, tool, task, output, validation, pipe
     # Upper (may import mid/bottom but not agent): model, providers, loop, memory, context, guardrails, checkpoint, ratelimit, observability
-    # Top: agent, multi_agent, cli
+    # Top: agent, multi_agent
     bottom_mid = {
         "enums",
         "exceptions",
@@ -67,7 +67,7 @@ def test_no_agent_import_in_bottom_mid_modules() -> None:
         "validation",
         "pipe",
     }
-    top_modules = {"syrin.agent", "syrin.agent.multi_agent", "syrin.cli"}
+    top_modules = {"syrin.agent", "syrin.agent.multi_agent"}
     # Check main __init__.py of each package (not submodules) for simplicity
     for name in bottom_mid:
         pkg = src / name

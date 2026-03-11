@@ -6,18 +6,16 @@ Voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer.
 
 from __future__ import annotations
 
-import base64
 from typing import Any
 
-from syrin.cost import calculate_voice_cost
-from syrin.generation._result import GenerationResult
+from syrin.generation._base_voice import BaseVoiceProvider
 
 _OPENAI_VOICES: frozenset[str] = frozenset(
     {"alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"}
 )
 
 
-class OpenAIVoiceProvider:
+class OpenAIVoiceProvider(BaseVoiceProvider):
     """OpenAI TTS provider. Implements VoiceGenerationProvider.
 
     Requires: pip install syrin[openai] or pip install openai.
@@ -31,81 +29,65 @@ class OpenAIVoiceProvider:
         model: str = "tts-1",
         **kwargs: Any,
     ) -> None:
-        self.api_key = api_key
+        super().__init__(api_key=api_key, model=model, **kwargs)
         self.voice = voice if voice in _OPENAI_VOICES else "alloy"
-        self.model = model
-        self._kwargs = kwargs
 
-    def generate(
+    def _get_api_key_env(self) -> str:
+        return "OPENAI_API_KEY"
+
+    def _get_package_name(self) -> str:
+        return "syrin[openai]"
+
+    def _synthesize(
         self,
         text: str,
         *,
-        voice_id: str = "default",
-        speed: float = 1.0,
-        language: str = "en",
-        output_format: str = "mp3",
+        api_key: str,
+        voice_id: str,
+        speed: float,
+        language: str,
+        output_format: str,
+        model_id: str,
         **kwargs: Any,
-    ) -> GenerationResult:
-        try:
-            from openai import OpenAI
-        except ImportError as e:
-            return GenerationResult(
-                success=False,
-                error=f"OpenAI TTS requires openai package. pip install syrin[openai]. {e!s}",
-            )
-        import os
+    ) -> tuple[bytes, str, str]:
+        from openai import OpenAI
 
-        key = self.api_key or os.environ.get("OPENAI_API_KEY")
-        if not key or not str(key).strip():
-            return GenerationResult(
-                success=False,
-                error="OpenAI TTS requires OPENAI_API_KEY or api_key=.",
-            )
         voice_name = voice_id if voice_id != "default" else self.voice
-        model_id = kwargs.get("model") or self.model
-        try:
-            client = OpenAI(api_key=key)
-            resp = client.audio.speech.create(
-                model=model_id,
-                voice=voice_name,
-                input=text,
-                speed=speed,
-                response_format=output_format,  # type: ignore[arg-type]
-                **{**self._kwargs, **{k: v for k, v in kwargs.items() if k != "model"}},
-            )
-            content_bytes = resp.content
-            if not content_bytes:
-                return GenerationResult(success=False, error="No audio in response")
-            mime = f"audio/{output_format}" if output_format != "mp3" else "audio/mpeg"
-            b64 = base64.b64encode(content_bytes).decode("ascii")
-            url = f"data:{mime};base64,{b64}"
-            cost_usd = calculate_voice_cost(model_id, len(text))
-            return GenerationResult(
-                success=True,
-                url=url,
-                content_type=mime,
-                content_bytes=content_bytes,
-                metadata={"cost_usd": cost_usd, "model_name": model_id},
-            )
-        except Exception as e:
-            return GenerationResult(success=False, error=str(e))
+        client = OpenAI(api_key=api_key)
+        resp = client.audio.speech.create(
+            model=model_id,
+            voice=voice_name,
+            input=text,
+            speed=speed,
+            response_format=output_format,  # type: ignore[arg-type]
+            **{**self._kwargs, **kwargs},
+        )
+        mime = "audio/mpeg" if output_format == "mp3" else f"audio/{output_format}"
+        return resp.content, model_id, mime
 
-    async def generate_async(
+    async def _asynthesize(
         self,
         text: str,
         *,
-        voice_id: str = "default",
-        speed: float = 1.0,
-        language: str = "en",
+        api_key: str,
+        voice_id: str,
+        speed: float,
+        language: str,
+        output_format: str,
+        model_id: str,
         **kwargs: Any,
-    ) -> GenerationResult:
-        import asyncio
+    ) -> tuple[bytes, str, str]:
+        from openai import AsyncOpenAI
 
-        return await asyncio.to_thread(
-            self.generate,
-            text,
-            voice_id=voice_id,
+        voice_name = voice_id if voice_id != "default" else self.voice
+        client = AsyncOpenAI(api_key=api_key)
+        resp = await client.audio.speech.create(
+            model=model_id,
+            voice=voice_name,
+            input=text,
             speed=speed,
-            language=language,
-            **kwargs,
+            response_format=output_format,  # type: ignore[arg-type]
+            **{**self._kwargs, **kwargs},
         )
+        mime = "audio/mpeg" if output_format == "mp3" else f"audio/{output_format}"
+        return resp.content, model_id, mime

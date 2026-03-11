@@ -129,22 +129,33 @@ class DirectoryLoader:
     def _get_files_by_glob(self) -> list[Path]:
         """Get files matching glob pattern."""
         if self._recursive:
-            return sorted(self._path.glob(self._glob))
-        return sorted(self._path.glob(self._glob.replace("**/", "")))
+            return sorted(p for p in self._path.glob(self._glob) if self._is_safe_path(p))
+        return sorted(
+            p for p in self._path.glob(self._glob.replace("**/", "")) if self._is_safe_path(p)
+        )
+
+    def _is_safe_path(self, path: Path) -> bool:
+        """Ensure resolved path is under the base directory (prevents path traversal)."""
+        try:
+            path.resolve().relative_to(self._path.resolve())
+            return True
+        except ValueError:
+            return False
 
     def _get_files_by_regex(self) -> list[Path]:
         """Get files matching regex pattern."""
-        assert self._pattern is not None  # Only called when pattern is set
+        if self._pattern is None:
+            raise ValueError("_get_files_by_regex called without pattern")
         regex = re.compile(self._pattern)
         files: list[Path] = []
 
         if self._recursive:
             for path in self._path.rglob("*"):
-                if path.is_file() and regex.match(path.name):
+                if path.is_file() and regex.match(path.name) and self._is_safe_path(path):
                     files.append(path)
         else:
             for path in self._path.glob("*"):
-                if path.is_file() and regex.match(path.name):
+                if path.is_file() and regex.match(path.name) and self._is_safe_path(path):
                     files.append(path)
 
         return sorted(files)

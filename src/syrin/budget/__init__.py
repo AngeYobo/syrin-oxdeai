@@ -320,6 +320,16 @@ class Budget(BaseModel):
         return self
 
     @property
+    def effective_run_limit(self) -> float | None:
+        """Effective run limit for budget checking: run - reserve when run > reserve, else run.
+
+        None if run is not set.
+        """
+        if self.run is None:
+            return None
+        return (self.run - self.reserve) if self.run > self.reserve else self.run
+
+    @property
     def remaining(self) -> float | None:
         """Get remaining budget (never negative). Returns None if run limit not set."""
         if self.run is None:
@@ -767,11 +777,7 @@ class BudgetTracker:
             self._month_days = token_per.month_days
             self._use_calendar_month = token_per.calendar_month
         if budget is not None:
-            effective_run = (
-                (budget.run - budget.reserve)
-                if budget.run is not None and budget.run > budget.reserve
-                else budget.run
-            )
+            effective_run = budget.effective_run_limit
             with self._lock:
                 run_and_reserved = self.current_run_cost + self._reserved
                 if effective_run is not None and run_and_reserved >= effective_run:

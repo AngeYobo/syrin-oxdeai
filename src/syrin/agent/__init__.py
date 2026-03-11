@@ -936,19 +936,6 @@ class Agent(Servable, metaclass=_AgentMeta):
         persistent_memory, memory_backend = _resolve_memory(memory)
         self._memory_component = AgentMemoryComponent(persistent_memory, memory_backend)
 
-        # Warn when context needs memory but memory is disabled
-        if self._memory_component.persistent_memory is None and ctx_config is not None:
-            mode = getattr(ctx_config, "context_mode", None)
-            if mode is not None and str(getattr(mode, "value", mode)) == "intelligent":
-                import warnings
-
-                warnings.warn(
-                    "context_mode=intelligent requires memory for relevance filtering; "
-                    "provide memory (e.g. memory=Memory()) or use context_mode=focused.",
-                    UserWarning,
-                    stacklevel=2,
-                )
-
         # Budget component: state and persistence
         self._budget_component = AgentBudgetComponent(
             budget, budget_store, budget_store_key, self._context_component.token_limits

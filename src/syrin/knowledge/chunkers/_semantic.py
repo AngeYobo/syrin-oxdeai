@@ -54,8 +54,19 @@ class SemanticChunker:
         self._embedding: EmbeddingProvider = config.embedding
 
     def chunk(self, documents: list[Document]) -> list[Chunk]:
-        """Sync entry point: runs achunk in event loop."""
-        return asyncio.run(self.achunk(documents))
+        """Sync entry point: runs achunk in event loop.
+
+        Raises RuntimeError if called from within an async context.
+        Use achunk() instead when running inside an event loop.
+        """
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.achunk(documents))
+        raise RuntimeError(
+            "SemanticChunker.chunk() cannot be called from an async context. "
+            "Use 'await chunker.achunk(documents)' instead."
+        )
 
     async def achunk(self, documents: list[Document]) -> list[Chunk]:
         result: list[Chunk] = []

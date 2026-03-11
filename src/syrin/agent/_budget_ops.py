@@ -29,11 +29,7 @@ def pre_call_budget_check(
     """If run budget would be exceeded after an estimated call, call on_exceeded and raise."""
     if agent._budget is None or agent._budget.run is None:
         return
-    effective_run = (
-        (agent._budget.run - agent._budget.reserve)
-        if agent._budget.run > agent._budget.reserve
-        else agent._budget.run
-    )
+    effective_run = agent._budget.effective_run_limit
     if effective_run is not None and effective_run <= 0:
         return
     estimate = agent.estimate_cost(messages, max_output_tokens=max_output_tokens)
@@ -70,12 +66,9 @@ def check_and_apply_budget(agent: Any) -> None:
     if result.status == BudgetStatus.THRESHOLD:
         current = agent._budget_tracker.current_run_cost
         limit = (
-            (agent._budget.run - agent._budget.reserve)
-            if agent._budget is not None
-            and agent._budget.run is not None
-            and agent._budget.reserve is not None
-            and agent._budget.run > agent._budget.reserve
-            else (agent._budget.run if agent._budget and agent._budget.run else 0.0)
+            agent._budget.effective_run_limit
+            if agent._budget is not None and agent._budget.effective_run_limit is not None
+            else 0.0
         )
         pct = int((current / limit) * 100) if limit and limit > 0 else 0
         agent._emit_event(
@@ -114,12 +107,7 @@ def check_and_apply_budget(agent: Any) -> None:
         if agent._budget is None:
             limit = 0.0
         else:
-            effective_run = (
-                (agent._budget.run - agent._budget.reserve)
-                if agent._budget.run is not None and agent._budget.run > agent._budget.reserve
-                else agent._budget.run
-            )
-            limit = effective_run or 0.0
+            limit = agent._budget.effective_run_limit or 0.0
         msg = f"Budget exceeded: run cost ${current:.4f} >= ${limit:.4f}"
     elif limit_key == BudgetLimitType.RUN_TOKENS:
         current = agent._budget_tracker.current_run_tokens

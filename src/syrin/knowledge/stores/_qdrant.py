@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
 
 from syrin.knowledge._chunker import Chunk
 from syrin.knowledge._store import MetadataFilter, SearchResult, chunk_id
+from syrin.knowledge.stores._metadata import metadata_from_flat, metadata_to_flat
 
 if TYPE_CHECKING:
     pass
@@ -58,6 +58,9 @@ except ImportError:
     pass
 
 
+_QDRANT_SKIP_KEYS = {"content", "document_id", "chunk_index", "token_count", "source", "source_type"}
+
+
 def _payload_from_chunk(chunk: Chunk) -> dict[str, str | int | float | bool | None]:
     """Convert chunk to JSON-serializable payload for Qdrant."""
     payload: dict[str, str | int | float | bool | None] = {
@@ -68,30 +71,15 @@ def _payload_from_chunk(chunk: Chunk) -> dict[str, str | int | float | bool | No
         "source": chunk.document_id,
         "source_type": str(chunk.metadata.get("source_type", "unknown")),
     }
-    for k, v in chunk.metadata.items():
-        if v is None or isinstance(v, (str, int, float, bool)):
-            payload[k] = v
-        elif isinstance(v, list):
-            payload[k] = json.dumps(v)
-        else:
-            payload[k] = str(v)
+    flat = metadata_to_flat(chunk.metadata)
+    for k, v in flat.items():
+        payload[k] = v
     return payload
 
 
 def _chunk_from_payload(payload: dict[str, object]) -> Chunk:
     """Reconstruct Chunk from Qdrant payload."""
-    meta: dict[str, str | int | float | bool | None | list[str]] = {}
-    skip = {"content", "document_id", "chunk_index", "token_count", "source", "source_type"}
-    for k, v in payload.items():
-        if k in skip:
-            continue
-        if isinstance(v, str) and v.startswith("["):
-            try:
-                meta[k] = json.loads(v)
-            except json.JSONDecodeError:
-                meta[k] = v
-        elif isinstance(v, (str, int, float, bool, type(None))):
-            meta[k] = v
+    meta = metadata_from_flat(payload, _QDRANT_SKIP_KEYS)
     return Chunk(
         content=str(payload.get("content", "")),
         metadata=meta,

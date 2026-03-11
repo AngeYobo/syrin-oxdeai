@@ -1,8 +1,6 @@
-"""Syrin CLI entry point for `python -m syrin`."""
+"""Syrin module entry point."""
 
 import sys
 
-from syrin.cli import main
-
-if __name__ == "__main__":
-    sys.exit(main())
+print("Syrin CLI is not available. Use `python my_agent.py --trace` for observability.")
+sys.exit(1)
