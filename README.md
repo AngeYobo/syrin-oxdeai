@@ -27,6 +27,18 @@
 
 ---
 
+## See It In Action
+
+### Syrin Debug — Live Terminal Debugging
+
+Watch your agents think in real-time:
+
+[![Syrin Pry Debugger](https://img.youtube.com/vi/Wofz35A5a60/0.jpg)](https://youtu.be/Wofz35A5a60)
+
+A Rich-based live terminal UI — never scroll through log walls again.
+
+---
+
 ## The Problem: "Why Did My AI Agent Cost $10,000 Last Month?"
 
 You built an AI agent. It worked perfectly in testing. Then came the bill — a surprise invoice for thousands of dollars with **zero warning**.
@@ -333,6 +345,111 @@ agent = Agent(
 
 ---
 
+### 9. Live Debugging with Pry
+
+Debug agents in a live terminal — see thinking, tokens, tools, and memory in real-time.
+
+```python
+agent = Agent(model=Model.OpenAI("gpt-4o"), debug=True)
+agent.run("Research AI trends")
+```
+
+Press `e` for errors, `t` for tools, `m` for memory, `f` for full trace. Exit with `q`.
+
+---
+
+### 10. Event-Driven Triggers (Watch)
+
+Agents that react to the world — webhooks, cron jobs, message queues.
+
+```python
+from syrin import Agent
+from syrin.watch import CronProtocol, WebhookProtocol, QueueProtocol
+
+# Cron-triggered agent
+agent.watch(CronProtocol(cron="0 9 * * *"), task="Send daily digest")
+
+# Webhook-triggered agent  
+agent.watch(WebhookProtocol(path="/webhook"), task="Process incoming request")
+
+# Queue consumer
+agent.watch(QueueProtocol(queue="tasks"), task="Process queued item")
+```
+
+---
+
+### 11. Production Knowledge (RAG)
+
+Ingest entire GitHub repos, docs, websites — with intelligent chunking and retrieval.
+
+```python
+from syrin import Knowledge
+from syrin.enums import ChunkStrategy
+
+kb = Knowledge(
+    sources=[
+        "https://docs.syrin.ai",
+        "github://owner/repo",  # Full repo ingestion
+    ],
+    chunk_strategy=ChunkStrategy.RECURSIVE,
+    embedding_provider="openai",
+)
+
+# Agent with knowledge
+agent = Agent(model=model, knowledge=kb)
+result = agent.run("How do I configure budget alerts?")
+# → Answers from your docs
+```
+
+**Supported sources:** GitHub, GitLab, websites, RSS feeds, Google Docs, Confluence, Notion.
+
+---
+
+### 12. Structured Output Enforcement
+
+Guaranteed JSON, Pydantic, or dataclass output — every time.
+
+```python
+from pydantic import BaseModel
+from syrin import Agent
+
+class Priority(BaseModel):
+    priority: str  # high, medium, low
+    category: str
+
+agent = Agent(
+    model=Model.OpenAI("gpt-4o"),
+    output_type=Priority,
+)
+
+result = agent.run("Classify: server down in us-east-1")
+# result.output is a Priority object, guaranteed
+# result.output.priority → "high"
+# result.output.category → "infrastructure"
+```
+
+---
+
+### 13. Prompt Injection Defense
+
+Defense-in-depth against the #1 security threat in LLM apps.
+
+```python
+from syrin import Agent
+from syrin.security import InputNormalization, SpotlightDefense, CanaryTokens
+
+agent = Agent(
+    model=Model.OpenAI("gpt-4o"),
+    security=[
+        InputNormalization(),      # Normalize inputs
+        SpotlightDefense(),        # Detect injection attempts
+        CanaryTokens(),            # Hidden tokens that trigger alerts
+    ],
+)
+```
+
+---
+
 ## Why Syrin
 
 | Feature | Syrin | DIY / Others |
@@ -345,6 +462,11 @@ agent = Agent(
 | **Thread-safe parallel** | SQLite WAL built-in | Implement locks |
 | **Agent memory** | 4 types, auto-managed | Manual setup |
 | **Observability** | 72+ hooks, full traces | Add-on tools |
+| **Live Debug (Pry)** | Rich TUI dashboard | Parse logs |
+| **Event Triggers** | cron, webhook, queue | Build schedulers |
+| **Production Knowledge** | GitHub, docs, RAG built-in | Manual indexing |
+| **Structured Output** | Guaranteed Pydantic/JSON | Parse + validate |
+| **Prompt Injection Defense** | Input normalization, spotlighting | DIY |
 | **Multi-agent** | Handoff, spawn, pipeline | Complex orchestration |
 | **Type-safe** | StrEnum, mypy strict | String hell |
 | **Production API** | One-line serve | Build Flask wrapper |
@@ -382,6 +504,11 @@ Multi-agent system that researches topics, verifies facts, and writes reports.
 | [Budget Control](docs/core/budget.md) | Complete budget guide + enterprise FAQ |
 | [Memory](docs/core/memory.md) | Memory types, backends, decay |
 | [Observability / Hooks](docs/debugging/hooks.md) | 72+ hook events, tracing |
+| [Syrin Debug](docs/debugging/pry.md) | Live terminal debugging with Pry |
+| [Watch / Triggers](docs/agent/watch-guide.md) | cron, webhook, queue triggers |
+| [Knowledge Pool](docs/integrations/knowledge-pool.md) | GitHub, docs, RAG ingestion |
+| [Structured Output](docs/agent/response-object.md) | Guaranteed Pydantic/JSON output |
+| [Prompt Injection](docs/advanced/prompt-injection.md) | Defense-in-depth security |
 | [Multi-Agent](docs/multi-agent/overview.md) | Handoff, spawn, DynamicPipeline |
 | [Guardrails](docs/agent/guardrails.md) | PII, length, content filtering |
 | [Serving](docs/production/serving.md) | HTTP API, playground, MCP |
