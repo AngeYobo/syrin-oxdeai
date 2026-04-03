@@ -7,8 +7,11 @@ import dataclasses
 import json
 import uuid
 from datetime import datetime
+from typing import TypeVar
 
 from pydantic import BaseModel
+
+_T = TypeVar("_T")
 
 from syrin.enums import A2AChannel, Hook
 from syrin.events import EventContext, Events
@@ -136,11 +139,43 @@ class A2AMessageEnvelope(BaseModel):  # type: ignore[explicit-any]
     to_agent: str
     channel: A2AChannel
     message_type: str
+    # `payload` holds a Pydantic BaseModel or @structured dataclass. It is
+    # typed as `object` because the router is generic — callers narrow the
+    # type using `get_typed_payload()` or a manual isinstance() check.
     payload: object
     timestamp: datetime
     requires_ack: bool = False
 
     model_config = {"arbitrary_types_allowed": True}
+
+    def get_typed_payload(self, payload_type: type[_T]) -> _T:
+        """Return the payload narrowed to *payload_type*.
+
+        Prefer this over raw ``envelope.payload`` so that mypy can infer
+        the concrete type of the message inside an inbox handler.
+
+        Args:
+            payload_type: The expected type of the payload (Pydantic model
+                class or ``@structured`` dataclass class).
+
+        Returns:
+            The payload cast to *payload_type*.
+
+        Raises:
+            TypeError: If the payload is not an instance of *payload_type*.
+
+        Example:
+            envelope = await router.receive(agent_id="writer", timeout=5.0)
+            if envelope:
+                result = envelope.get_typed_payload(ResearchResult)
+                print(result.summary)  # fully typed
+        """
+        if not isinstance(self.payload, payload_type):
+            raise TypeError(
+                f"Expected payload of type {payload_type.__name__!r}, "
+                f"got {type(self.payload).__name__!r}"
+            )
+        return self.payload
 
 
 class A2AAuditEntry(BaseModel):  # type: ignore[explicit-any]

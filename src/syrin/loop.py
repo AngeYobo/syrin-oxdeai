@@ -1183,13 +1183,89 @@ class CodeActionLoop(Loop):
                 code = code_blocks[0].strip()
 
                 try:
+                    import builtins
                     import io
                     from contextlib import redirect_stdout
+
+                    # Restrict execution to a safe subset of builtins.
+                    # __builtins__ is set explicitly to block __import__, eval,
+                    # exec, open, compile, and other dangerous callables.
+                    # Only pure-computation builtins are exposed.
+                    _SAFE_BUILTINS: dict[str, object] = {
+                        name: getattr(builtins, name)
+                        for name in (
+                            "abs",
+                            "all",
+                            "any",
+                            "ascii",
+                            "bin",
+                            "bool",
+                            "bytes",
+                            "chr",
+                            "dict",
+                            "divmod",
+                            "enumerate",
+                            "filter",
+                            "float",
+                            "format",
+                            "frozenset",
+                            "getattr",
+                            "hasattr",
+                            "hash",
+                            "hex",
+                            "int",
+                            "isinstance",
+                            "issubclass",
+                            "iter",
+                            "len",
+                            "list",
+                            "map",
+                            "max",
+                            "min",
+                            "next",
+                            "oct",
+                            "ord",
+                            "pow",
+                            "print",
+                            "range",
+                            "repr",
+                            "reversed",
+                            "round",
+                            "set",
+                            "slice",
+                            "sorted",
+                            "str",
+                            "sum",
+                            "tuple",
+                            "type",
+                            "zip",
+                            "True",
+                            "False",
+                            "None",
+                            "ArithmeticError",
+                            "AssertionError",
+                            "AttributeError",
+                            "EOFError",
+                            "Exception",
+                            "IndexError",
+                            "KeyError",
+                            "NameError",
+                            "NotImplementedError",
+                            "OSError",
+                            "OverflowError",
+                            "RuntimeError",
+                            "StopIteration",
+                            "TypeError",
+                            "ValueError",
+                            "ZeroDivisionError",
+                        )
+                        if hasattr(builtins, name)
+                    }
 
                     output_buffer = io.StringIO()
                     try:
                         with redirect_stdout(output_buffer):
-                            exec(code, {"print": lambda x: print(x)}, {})
+                            exec(code, {"__builtins__": _SAFE_BUILTINS}, {})  # nosec B102
                         code_output = output_buffer.getvalue()
                     except Exception as e:
                         code_output = f"Error: {str(e)}"

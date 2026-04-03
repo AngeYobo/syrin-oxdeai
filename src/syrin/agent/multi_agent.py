@@ -1,11 +1,29 @@
-"""Multi-agent patterns: Pipeline, Team, and orchestration utilities."""
+"""Multi-agent patterns: Pipeline, Team, and orchestration utilities.
+
+.. deprecated::
+    ``syrin.agent.multi_agent`` is deprecated as of v0.11.0 and will be
+    removed in v0.12.0.  Migrate to the following replacements:
+
+    * ``Pipeline`` → :class:`syrin.agent.pipeline.Pipeline`
+    * ``Team`` → :class:`syrin.swarm.Swarm`
+    * Dynamic orchestration → :class:`syrin.agent.agent_router.AgentRouter`
+"""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 import time
+import warnings
 from typing import TypedDict, TypeVar, Unpack, cast
+
+warnings.warn(
+    "syrin.agent.multi_agent is deprecated as of v0.11.0 and will be removed "
+    "in v0.12.0. Use syrin.agent.pipeline.Pipeline, syrin.swarm.Swarm, or "
+    "syrin.agent.agent_router.AgentRouter instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from syrin.agent import Agent
 from syrin.audit import AuditHookHandler, AuditLog
@@ -438,6 +456,7 @@ class Pipeline(Watchable, Servable):
         sequential: bool = True,
         debug: bool = False,
         audit: AuditLog | None = None,
+        pry: bool = False,
     ) -> None:
         """Initialize pipeline.
 
@@ -450,6 +469,8 @@ class Pipeline(Watchable, Servable):
             sequential: Default execution mode. True = sequential, False = parallel.
             debug: Enable debug logging to console.
             audit: Optional AuditLog for pipeline-level audit. Events emitted to it.
+            pry: Enable the Pry debugger for this pipeline. When ``True``, the
+                pipeline activates the Pry TUI at breakpoints.
         """
         self._budget = budget
         self._timeout = timeout
@@ -457,6 +478,7 @@ class Pipeline(Watchable, Servable):
         self._sequential = sequential
         self._debug = debug
         self._audit = audit
+        self._pry: bool = pry
         self._events = Events(self._emit_pipeline_hook)
         if audit is not None:
             if not isinstance(audit, AuditLog):
