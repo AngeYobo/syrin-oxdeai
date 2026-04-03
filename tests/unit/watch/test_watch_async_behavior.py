@@ -16,6 +16,15 @@ import pytest
 
 
 class TestCronProtocolAsyncBehavior:
+    """Test suite for CronProtocol async runtime behavior.
+
+    Tests the actual execution behavior of CronProtocol including:
+    - run_on_start immediate execution
+    - stop() termination
+    - Handler exception handling
+    - TriggerEvent metadata creation
+    """
+
     @pytest.mark.asyncio
     async def test_cron_run_on_start_fires_immediately(self) -> None:
         """When run_on_start=True, handler is called before first scheduled tick."""
@@ -90,7 +99,7 @@ class TestCronProtocolAsyncBehavior:
             await asyncio.wait_for(task, timeout=1.0)
 
         # Should have fired once from run_on_start, then stopped before next schedule
-        assert call_count >= 1  # At least one from run_on_start
+        assert call_count == 1  # Exactly one from run_on_start
 
     @pytest.mark.asyncio
     async def test_cron_handler_exception_is_logged_not_raised(self) -> None:
@@ -155,7 +164,11 @@ class TestCronProtocolAsyncBehavior:
 
 
 class MockQueueBackend:
-    """Mock queue backend for testing QueueProtocol behavior."""
+    """Mock queue backend for testing QueueProtocol behavior.
+
+    Simulates a message queue backend that yields messages and tracks
+    ack/nack operations for testing purposes.
+    """
 
     def __init__(self, messages: list[str]) -> None:
         self.messages = messages
@@ -166,24 +179,38 @@ class MockQueueBackend:
         self._index = 0
 
     async def connect(self) -> None:
+        """Simulate backend connection."""
         self.connected = True
 
     async def disconnect(self) -> None:
+        """Simulate backend disconnection."""
         self.disconnected = True
 
     async def receive(self) -> AsyncIterator[tuple[str, object]]:
+        """Yield messages with handles for testing."""
         for i, msg in enumerate(self.messages):
             yield msg, f"handle-{i}"
             await asyncio.sleep(0.01)
 
     async def ack(self, message_id: object) -> None:
+        """Record message acknowledgment."""
         self.acked.append(message_id)
 
     async def nack(self, message_id: object) -> None:
+        """Record message rejection."""
         self.nacked.append(message_id)
 
 
 class TestQueueProtocolAsyncBehavior:
+    """Test suite for QueueProtocol async runtime behavior.
+
+    Tests the actual execution behavior of QueueProtocol including:
+    - Message processing and ack/nack behavior
+    - Concurrency limits
+    - Backend connection failure handling
+    - TriggerEvent metadata creation
+    """
+
     @pytest.mark.asyncio
     async def test_queue_processes_messages_and_acks_on_success(self) -> None:
         """QueueProtocol processes messages and calls ack() on success."""
@@ -390,7 +417,11 @@ class TestQueueProtocolAsyncBehavior:
 
 
 class MockWatchable:
-    """Mock watchable object for testing watch_handler behavior."""
+    """Mock watchable object for testing watch_handler behavior.
+
+    Provides a minimal implementation of the Watchable interface for testing
+    watch_handler() functionality including timeout, callbacks, and concurrency.
+    """
 
     def __init__(self) -> None:
 
@@ -409,6 +440,7 @@ class MockWatchable:
         self.should_raise = False
 
     async def arun(self, input: str) -> str:  # noqa: A002
+        """Simulate async run with configurable delay and error behavior."""
         self.run_count += 1
         await asyncio.sleep(self.run_delay)
         if self.should_raise:
@@ -432,6 +464,15 @@ class MockWatchable:
 
 
 class TestWatchableHandlerAsyncBehavior:
+    """Test suite for Watchable.watch_handler() async runtime behavior.
+
+    Tests the actual execution behavior of watch_handler() including:
+    - Timeout enforcement
+    - on_result and on_error callback invocation
+    - Concurrency limit enforcement via semaphore
+    - Parameter override behavior
+    """
+
     @pytest.mark.asyncio
     async def test_watch_handler_enforces_timeout(self) -> None:
         """watch_handler() enforces timeout and raises TimeoutError."""
@@ -509,24 +550,31 @@ class TestWatchableHandlerAsyncBehavior:
         obj = MockWatchable()
         obj.run_delay = 0.1
 
+        # Track concurrent execution
+        active_count = 0
+        max_active = 0
+
+        original_arun = obj.arun
+
+        async def tracking_arun(input: str) -> str:  # noqa: A002
+            nonlocal active_count, max_active
+            active_count += 1
+            max_active = max(max_active, active_count)
+            result = await original_arun(input)
+            active_count -= 1
+            return result
+
+        obj.arun = tracking_arun
+
         handler = Watchable.watch_handler(obj, concurrency=2)
 
-        # Fire 4 events and measure total time
-        start_time = asyncio.get_event_loop().time()
+        # Fire 4 events concurrently
         events = [TriggerEvent(input=f"msg{i}", source="test") for i in range(4)]
         results = await asyncio.gather(*[handler(e) for e in events])
-        end_time = asyncio.get_event_loop().time()
-
-        total_time = end_time - start_time
 
         assert len(results) == 4
-        # With concurrency=2 and 4 tasks of 0.1s each:
-        # - If all ran in parallel: ~0.1s
-        # - If concurrency=2: ~0.2s (2 batches)
-        # - If sequential: ~0.4s
-        # Allow some margin for overhead
-        assert total_time >= 0.15  # Should take at least 2 batches
-        assert total_time < 0.35  # But not sequential
+        # With concurrency=2, max_active should never exceed 2
+        assert max_active == 2
 
     @pytest.mark.asyncio
     async def test_watch_handler_override_params_take_precedence(self) -> None:
@@ -551,6 +599,13 @@ class TestWatchableHandlerAsyncBehavior:
 
 
 class TestWatchableTriggerAsyncBehavior:
+    """Test suite for Watchable.trigger() async runtime behavior.
+
+    Tests the actual execution behavior of trigger() including:
+    - arun() invocation and result handling
+    - Metadata passing to TriggerEvent
+    """
+
     @pytest.mark.asyncio
     async def test_trigger_calls_arun_and_returns_result(self) -> None:
         """trigger() calls arun() and returns the result."""
