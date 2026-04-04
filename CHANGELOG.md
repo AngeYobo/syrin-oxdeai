@@ -87,6 +87,37 @@ This release delivers first-class multi-agent orchestration (5 topologies), a fu
 
 ---
 
+### DX & API Consistency (post-release patch)
+
+#### `ExceedPolicy` is now the canonical budget API
+- `Budget(exceed_policy=ExceedPolicy.STOP|WARN|IGNORE|SWITCH)` replaces the raw callback pattern
+- `Budget(on_exceeded=raise_on_exceeded|warn_on_exceeded|stop_on_exceeded)` now emits a `DeprecationWarning` — still works, will be removed in a future major version
+- `TokenLimits(exceed_policy=...)` follows the same pattern
+- All docs, examples, and tests migrated to `ExceedPolicy`
+
+#### `MockResponseMode` enum
+- `Model.mock()` and `Model.Almock()` now accept `response_mode=MockResponseMode.LOREM|CUSTOM` instead of raw strings `"lorem"/"custom"`
+- `MockPricing` type widened to `MockPricing | str | None` for backward compatibility
+
+#### `@tool` footgun warnings
+- `@tool` without a description now emits a `UserWarning` at decoration time — the LLM silently ignores undescribed tools
+- `depends_on=["tool_name"]` (raw strings) now emits a `DeprecationWarning`; pass the `ToolSpec` object directly to catch renames at import time
+
+#### `Response` structured output shortcuts
+- `response.is_valid` — `True` if no structured output, or if structured output passed validation
+- `response.validation_attempts` — number of retry attempts made during structured output parsing
+- `response.parsed` — alias for `response.output` (structured output result)
+
+#### Tool result truncation visibility
+- Tool result truncation is now logged at `WARNING` level (was `INFO`) with the tool name, original length, and truncated length
+- If no `max_tool_result_length` is set and the safety cap fires, a `WARNING` is emitted with instructions to set the limit explicitly
+
+#### Class-based agent as canonical pattern
+- All docs and examples now present class-based agent definition as the recommended pattern
+- Constructor/keyword pattern documented as "quick one-off scripts" only
+
+---
+
 ### Documentation
 
 - Full Budget Intelligence guide (`docs/budget/`)
