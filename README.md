@@ -155,8 +155,8 @@ from syrin.enums import MemoryType
 agent = Agent(model=Model.OpenAI("gpt-4o-mini", api_key="..."))
 
 # Store — persisted across sessions
-agent.remember("User is a TypeScript engineer at a fintech startup", memory_type=MemoryType.CORE)
-agent.remember("Previous session: reviewed authentication architecture", memory_type=MemoryType.EPISODIC)
+agent.remember("User is a TypeScript engineer at a fintech startup", memory_type=MemoryType.FACTS)
+agent.remember("Previous session: reviewed authentication architecture", memory_type=MemoryType.HISTORY)
 
 # Recall — semantic search over stored memories
 memories = agent.recall("user background", limit=5)
@@ -167,10 +167,10 @@ agent.forget("previous role title")
 
 | Memory Type | Stores |
 |---|---|
-| `CORE` | Long-term facts — user profile, preferences, domain knowledge |
-| `EPISODIC` | Conversation history and past events |
-| `SEMANTIC` | Embedding-indexed knowledge for RAG |
-| `PROCEDURAL` | Skills, workflows, how-to instructions |
+| `FACTS` | Identity and preferences — user name, role, language, persistent facts |
+| `HISTORY` | Past events and conversations — chronological, session context |
+| `KNOWLEDGE` | General knowledge and concepts — ideal for vector/semantic search |
+| `INSTRUCTIONS` | Skills and how-to knowledge — workflows, user preferences on process |
 
 **Backends:** SQLite (zero config), PostgreSQL, Redis, Qdrant, ChromaDB — swap with one line.
 
@@ -316,7 +316,7 @@ class EscalationAgent(Agent):
     system_prompt = "You handle escalated support cases requiring senior judgment."
 
 agent = SupportAgent()
-agent.remember(f"Customer {user_id}: premium plan, joined 2023", memory_type=MemoryType.CORE)
+agent.remember(f"Customer {user_id}: premium plan, joined 2023", memory_type=MemoryType.FACTS)
 
 result = agent.run(user_message)
 
