@@ -27,6 +27,7 @@ What is exported here:
         guardrails, memory, budgets, serving adapters, and debugging support.
 """
 
-from syrin.agent._core import Agent
+from syrin.agent._core import Agent, ContextQuality
+from syrin.agent.agent_router import AgentRouter
 
-__all__ = ["Agent"]
+__all__ = ["Agent", "AgentRouter", "ContextQuality"]

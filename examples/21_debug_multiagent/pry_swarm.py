@@ -26,7 +26,7 @@ import tempfile
 
 from syrin import Agent, Budget, Model
 from syrin.debug import Pry
-from syrin.debug._state_export import StateExporter
+from syrin.debug import StateExporter
 from syrin.enums import Hook, SwarmTopology
 from syrin.response import Response
 from syrin.swarm import A2AConfig, A2ARouter, Swarm, SwarmConfig

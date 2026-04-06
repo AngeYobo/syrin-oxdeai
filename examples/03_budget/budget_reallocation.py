@@ -24,11 +24,10 @@ from __future__ import annotations
 
 import asyncio
 
-from syrin.budget._pool import BudgetPool
+from syrin.budget import BudgetPool
 from syrin.budget.exceptions import BudgetAllocationError
 from syrin.enums import AgentRole, AgentStatus, ControlAction
-from syrin.swarm._authority import SwarmAuthorityGuard
-from syrin.swarm._control import AgentStateSnapshot, SwarmController
+from syrin.swarm import AgentStateSnapshot, SwarmAuthorityGuard, SwarmController
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 

@@ -25,7 +25,7 @@ import asyncio
 from syrin import Agent, Model
 from syrin.enums import Hook, RemoteField
 from syrin.remote_config import RemoteConfig
-from syrin.remote_config._core import ConfigRejectedError
+from syrin.remote_config import ConfigRejectedError
 from syrin.response import Response
 
 # ── Agent with RemoteConfig ───────────────────────────────────────────────────

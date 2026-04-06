@@ -28,7 +28,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from syrin import Agent, Model
-from syrin.checkpoint._core import MemoryCheckpointBackend, SQLiteCheckpointBackend
+from syrin.checkpoint import MemoryCheckpointBackend, SQLiteCheckpointBackend
 from syrin.enums import PauseMode, WorkflowStatus
 from syrin.workflow import Workflow
 from syrin.workflow.exceptions import WorkflowCancelledError

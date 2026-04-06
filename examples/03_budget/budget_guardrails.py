@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import asyncio
 
-from syrin.budget._guardrails import (
+from syrin.budget import (
     AnomalyConfig,
     BudgetGuardrails,
     BudgetLimitError,

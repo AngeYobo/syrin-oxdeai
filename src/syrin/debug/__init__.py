@@ -49,6 +49,7 @@ anywhere in your code.
 """
 
 from syrin._replay import replay_trace
+from syrin.debug._state_export import ExportSnapshot, StateExporter
 from syrin.debug._ui import Pry
 
-__all__ = ["Pry", "replay_trace"]
+__all__ = ["ExportSnapshot", "Pry", "replay_trace", "StateExporter"]

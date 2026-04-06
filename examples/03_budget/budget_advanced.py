@@ -116,7 +116,7 @@ def example_store_estimation(store: FileBudgetStore) -> None:
 
 
 def example_custom_store() -> None:
-    from syrin.budget._history import BudgetStoreProtocol, CostStats
+    from syrin.budget import BudgetStoreProtocol, CostStats
 
     print("── Example 3: Custom BudgetStore backend ────────────────────────────")
 

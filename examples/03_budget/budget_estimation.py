@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 
 from syrin import Agent, Budget, Model
-from syrin.budget._estimate import EstimationReport
+from syrin.budget import EstimationReport
 from syrin.enums import Hook, PreflightPolicy
 from syrin.response import Response
 from syrin.workflow import Workflow

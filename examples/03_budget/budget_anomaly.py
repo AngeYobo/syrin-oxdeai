@@ -20,7 +20,7 @@ import asyncio
 import logging
 
 from syrin import Agent, Budget, Model
-from syrin.budget._guardrails import AnomalyConfig, BudgetGuardrails
+from syrin.budget import AnomalyConfig, BudgetGuardrails
 from syrin.enums import Hook
 from syrin.response import Response
 from syrin.workflow import Workflow

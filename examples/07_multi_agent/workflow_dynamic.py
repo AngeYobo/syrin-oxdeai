@@ -75,7 +75,7 @@ class SynthesisAgent(Agent):
 
 def _topic_factory(ctx: object) -> list[tuple[type[TopicAnalystAgent], str, float]]:
     """Parse one sub-topic per line from ctx.content, spawn one analyst per topic."""
-    from syrin.workflow._context import HandoffContext  # noqa: PLC0415
+    from syrin.workflow import HandoffContext  # noqa: PLC0415
 
     content: str = ctx.content if isinstance(ctx, HandoffContext) else str(ctx)  # type: ignore[union-attr]
     topics = [line.strip() for line in content.splitlines() if line.strip()]
@@ -200,7 +200,7 @@ async def example_budget_aware_factory() -> None:
     def _budget_aware_factory(
         ctx: object,
     ) -> list[tuple[type[TopicAnalystAgent], str, float]]:
-        from syrin.workflow._context import HandoffContext  # noqa: PLC0415
+        from syrin.workflow import HandoffContext  # noqa: PLC0415
 
         content: str = ctx.content if isinstance(ctx, HandoffContext) else str(ctx)  # type: ignore[union-attr]
         budget_remaining: float = (

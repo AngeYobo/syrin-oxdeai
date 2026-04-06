@@ -26,7 +26,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from syrin import Agent, Budget, Model
-from syrin.agent.agent_router import AgentRouter
+from syrin.agent import AgentRouter
 from syrin.enums import Hook
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")

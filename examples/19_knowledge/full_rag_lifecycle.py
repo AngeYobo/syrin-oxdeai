@@ -45,7 +45,7 @@ from syrin.knowledge import (
     Knowledge,
     get_chunker,
 )
-from syrin.knowledge._chunker import ChunkConfig
+from syrin.knowledge import ChunkConfig
 from syrin.model import Model
 
 

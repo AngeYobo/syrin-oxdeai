@@ -16,9 +16,9 @@ from __future__ import annotations
 import asyncio
 import time
 
-from syrin.agent._core import Agent, ContextQuality
+from syrin.agent import Agent, ContextQuality
 from syrin.enums import AgentStatus, Hook
-from syrin.swarm._registry import AgentRegistry, AgentSummary
+from syrin.swarm import AgentRegistry, AgentSummary
 
 # ---------------------------------------------------------------------------
 # Simulate a couple of agent "instances" with synthetic IDs
