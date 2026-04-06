@@ -34,6 +34,10 @@ Syrin is built differently. Budget control, memory, observability, multi-agent o
 
 ---
 
+```bash
+pip install syrin
+```
+
 ## 30-Second Quickstart
 
 ```python
@@ -361,9 +365,6 @@ print(f"Risk: {risk.risk_level} — {risk.recommended_action}")
 ## Installation
 
 ```bash
-# Core library
-pip install syrin
-
 # With OpenAI support
 pip install syrin[openai]
 
