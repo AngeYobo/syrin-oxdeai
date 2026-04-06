@@ -14,7 +14,7 @@ from syrin.knowledge import (
     Document,
     get_chunker,
 )
-from syrin.knowledge import ChunkConfig
+from syrin.knowledge._chunker import ChunkConfig  # internal low-level API
 
 
 def main() -> None:

@@ -23,7 +23,6 @@ Exported surface:
     - built-in loaders and helper factories such as ``get_chunker``
 """
 
-from syrin.knowledge._chunker import ChunkConfig
 from syrin.knowledge._core import (
     CancellableIngestTask,
     Chunk,
@@ -56,7 +55,6 @@ from syrin.knowledge._core import (
 )
 
 __all__ = [
-    "ChunkConfig",
     "GroundedFact",
     "Chunk",
     "ChunkMetadata",
