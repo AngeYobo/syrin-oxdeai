@@ -139,7 +139,7 @@ class OpenAIEmbedding:
             if self._dimensions != _MODEL_DIMENSIONS.get(self._model, 1536):
                 kwargs["dimensions"] = self._dimensions
 
-            response = await client.embeddings.create(**kwargs)  # type: ignore[arg-type]
+            response = await client.embeddings.create(**kwargs)
 
             all_embeddings.extend(item.embedding for item in response.data)
 

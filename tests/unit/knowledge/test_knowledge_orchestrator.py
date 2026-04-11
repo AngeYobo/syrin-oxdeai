@@ -150,6 +150,12 @@ class TestKnowledgeConstructor:
 class TestKnowledgeIngest:
     """Ingest pipeline: load -> chunk -> embed -> store."""
 
+    @pytest.fixture(autouse=True)
+    def _require_chonkie(self) -> None:  # type: ignore[return]
+        pytest.importorskip(
+            "chonkie", reason="chonkie not installed (pip install syrin[knowledge])"
+        )
+
     @pytest.mark.asyncio
     async def test_ingest_loads_chunks_embeds_stores(self) -> None:
         """ingest() runs full pipeline and stores chunks."""
@@ -201,6 +207,12 @@ class TestKnowledgeIngest:
 
 class TestKnowledgeSearch:
     """Search method."""
+
+    @pytest.fixture(autouse=True)
+    def _require_chonkie(self) -> None:  # type: ignore[return]
+        pytest.importorskip(
+            "chonkie", reason="chonkie not installed (pip install syrin[knowledge])"
+        )
 
     @pytest.mark.asyncio
     async def test_search_triggers_lazy_ingest(self) -> None:
@@ -312,6 +324,12 @@ class TestSearchResultDedup:
 
 class TestKnowledgeLifecycle:
     """add_source, remove_source, clear, stats."""
+
+    @pytest.fixture(autouse=True)
+    def _require_chonkie(self) -> None:  # type: ignore[return]
+        pytest.importorskip(
+            "chonkie", reason="chonkie not installed (pip install syrin[knowledge])"
+        )
 
     @pytest.mark.asyncio
     async def test_add_source(self) -> None:

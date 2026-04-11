@@ -108,6 +108,7 @@ class TestExcelLoader:
 
     def test_file_not_found_raises(self) -> None:
         """ExcelLoader raises FileNotFoundError when file does not exist."""
+        pytest.importorskip("openpyxl", reason="openpyxl not installed (pip install syrin[excel])")
         from syrin.knowledge.loaders import ExcelLoader
 
         loader = ExcelLoader("/nonexistent/file.xlsx")

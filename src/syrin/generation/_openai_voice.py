@@ -57,8 +57,8 @@ class OpenAIVoiceProvider(BaseVoiceProvider):
             voice=voice_name,
             input=text,
             speed=speed,
-            response_format=output_format,  # type: ignore[arg-type]
-            **{**self._kwargs, **kwargs},  # type: ignore[arg-type]
+            response_format=output_format,
+            **{**self._kwargs, **kwargs},
         )
         mime = "audio/mpeg" if output_format == "mp3" else f"audio/{output_format}"
         return resp.content, model_id, mime
@@ -84,8 +84,8 @@ class OpenAIVoiceProvider(BaseVoiceProvider):
             voice=voice_name,
             input=text,
             speed=speed,
-            response_format=output_format,  # type: ignore[arg-type]
-            **{**self._kwargs, **kwargs},  # type: ignore[arg-type]
+            response_format=output_format,
+            **{**self._kwargs, **kwargs},
         )
         mime = "audio/mpeg" if output_format == "mp3" else f"audio/{output_format}"
         return resp.content, model_id, mime

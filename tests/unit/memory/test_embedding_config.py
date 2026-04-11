@@ -95,6 +95,9 @@ class TestMemoryWithEmbeddingConfig:
 
     def test_qdrant_with_custom_embedding(self, temp_dir: str) -> None:
         """Qdrant with EmbeddingConfig.custom_fn uses custom embeddings."""
+        pytest.importorskip(
+            "qdrant_client", reason="qdrant_client not installed (pip install syrin[vector])"
+        )
         mem = Memory(
             backend=MemoryBackend.QDRANT,
             write_mode=WriteMode.SYNC,
@@ -113,6 +116,7 @@ class TestMemoryWithEmbeddingConfig:
 
     def test_chroma_with_custom_embedding(self, temp_dir: str) -> None:
         """Chroma with EmbeddingConfig.custom_fn uses custom embeddings."""
+        pytest.importorskip("chromadb", reason="chromadb not installed (pip install syrin[vector])")
         chroma_path = os.path.join(temp_dir, f"chroma_{uuid.uuid4().hex[:8]}")
         mem = Memory(
             backend=MemoryBackend.CHROMA,

@@ -65,7 +65,7 @@ class DalleImageProvider:
         response_format = "b64_json" if "png" in output_mime_type.lower() else "b64_json"
         try:
             client = OpenAI(api_key=key)
-            resp = client.images.generate(  # type: ignore[call-overload]
+            resp = client.images.generate(
                 prompt=prompt[:4000],
                 model=model_id,
                 n=min(number_of_images, 1),

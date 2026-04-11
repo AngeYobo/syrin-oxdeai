@@ -67,6 +67,9 @@ class TestMemoryWithVectorConfigs:
 
     def test_memory_with_qdrant_config_path(self, temp_dir: str) -> None:
         """Memory with QdrantConfig path uses embedded Qdrant."""
+        pytest.importorskip(
+            "qdrant_client", reason="qdrant_client not installed (pip install syrin[vector])"
+        )
         mem = Memory(
             backend=MemoryBackend.QDRANT,
             write_mode=WriteMode.SYNC,
@@ -79,6 +82,7 @@ class TestMemoryWithVectorConfigs:
 
     def test_memory_with_chroma_config(self, temp_dir: str) -> None:
         """Memory with ChromaConfig uses Chroma backend."""
+        pytest.importorskip("chromadb", reason="chromadb not installed (pip install syrin[vector])")
         chroma_path = os.path.join(temp_dir, f"chroma_{uuid.uuid4().hex[:8]}")
         mem = Memory(
             backend=MemoryBackend.CHROMA,
@@ -91,6 +95,9 @@ class TestMemoryWithVectorConfigs:
 
     def test_memory_with_qdrant_config_namespace(self, temp_dir: str) -> None:
         """Memory with QdrantConfig namespace stores namespace in payload."""
+        pytest.importorskip(
+            "qdrant_client", reason="qdrant_client not installed (pip install syrin[vector])"
+        )
         qdrant_path = os.path.join(temp_dir, "qdrant_ns")
         os.makedirs(qdrant_path, exist_ok=True)
         mem = Memory(

@@ -143,6 +143,7 @@ class TestSaveAs:
         assert data == b"hello"
 
     def test_save_as_docx_writes_file(self) -> None:
+        pytest.importorskip("docx", reason="python-docx not installed (pip install syrin[docx])")
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "out.docx"
             result = save_as_docx("Hello World", p, title="Doc")
@@ -151,6 +152,7 @@ class TestSaveAs:
             assert p.stat().st_size > 0
 
     def test_save_as_docx_returns_bytes_when_path_none(self) -> None:
+        pytest.importorskip("docx", reason="python-docx not installed (pip install syrin[docx])")
         data = save_as_docx("Hello", None)
         assert isinstance(data, bytes)
         assert len(data) > 0

@@ -118,6 +118,7 @@ class TestLiteLLMEmbeddingBatchSize:
     @pytest.mark.asyncio
     async def test_accepts_batch_size_param(self) -> None:
         """LiteLLMEmbedding __init__ accepts batch_size without error."""
+        pytest.importorskip("litellm", reason="litellm not installed (pip install syrin[litellm])")
         from syrin.embedding._litellm import LiteLLMEmbedding
 
         provider = LiteLLMEmbedding("cohere/embed-english-v3.0", batch_size=50)
@@ -126,6 +127,7 @@ class TestLiteLLMEmbeddingBatchSize:
     @pytest.mark.asyncio
     async def test_default_batch_size_is_100(self) -> None:
         """Default batch_size is 100."""
+        pytest.importorskip("litellm", reason="litellm not installed (pip install syrin[litellm])")
         from syrin.embedding._litellm import LiteLLMEmbedding
 
         provider = LiteLLMEmbedding("cohere/embed-english-v3.0")
@@ -134,6 +136,7 @@ class TestLiteLLMEmbeddingBatchSize:
     @pytest.mark.asyncio
     async def test_large_input_split_into_batches(self) -> None:
         """200 texts with batch_size=100 results in 2 API calls."""
+        pytest.importorskip("litellm", reason="litellm not installed (pip install syrin[litellm])")
         from syrin.embedding._litellm import LiteLLMEmbedding
 
         provider = LiteLLMEmbedding("cohere/embed-english-v3.0", batch_size=100)

@@ -192,6 +192,7 @@ class TestOpenAIEmbedding:
     @pytest.mark.asyncio
     async def test_embed_returns_correct_count(self, mock_env: None) -> None:
         """embed() returns correct number of embeddings."""
+        pytest.importorskip("openai", reason="openai not installed (pip install syrin[openai])")
         from syrin.embedding._openai import OpenAIEmbedding
 
         with patch("openai.AsyncOpenAI") as mock_client:
@@ -208,6 +209,7 @@ class TestOpenAIEmbedding:
     @pytest.mark.asyncio
     async def test_embed_single_text(self, mock_env: None) -> None:
         """embed() works with single text."""
+        pytest.importorskip("openai", reason="openai not installed (pip install syrin[openai])")
         from syrin.embedding._openai import OpenAIEmbedding
 
         with patch("openai.AsyncOpenAI") as mock_client:
@@ -443,6 +445,7 @@ class TestEmbeddingCostTracking:
     @pytest.mark.asyncio
     async def test_cost_tracking_with_budget(self) -> None:
         """Embedding costs are tracked in BudgetTracker."""
+        pytest.importorskip("openai", reason="openai not installed (pip install syrin[openai])")
         from unittest.mock import MagicMock
 
         from syrin.embedding._openai import OpenAIEmbedding
@@ -468,6 +471,7 @@ class TestEmbeddingCostTracking:
     @pytest.mark.asyncio
     async def test_cost_tracking_without_budget(self) -> None:
         """Works without BudgetTracker (no tracking)."""
+        pytest.importorskip("openai", reason="openai not installed (pip install syrin[openai])")
         from syrin.embedding._openai import OpenAIEmbedding
 
         with (
