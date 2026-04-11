@@ -673,7 +673,7 @@ class TestLoaderErrors:
         with pytest.raises(FileNotFoundError):
             loader.load()
 
-    def test_pdf_loader_missing_dependency(self) -> None:
+    def test_pdf_loader_missing_dependency(self, tmp_path: Path) -> None:
         """PDFLoader raises if docling not installed."""
         try:
             import docling  # noqa: F401
@@ -684,7 +684,9 @@ class TestLoaderErrors:
 
         from syrin.knowledge.loaders import PDFLoader
 
-        loader = PDFLoader("/any/path.pdf")
+        pdf_file = tmp_path / "test.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4")  # minimal valid header so file exists
+        loader = PDFLoader(str(pdf_file))
         with pytest.raises(ImportError, match="docling"):
             loader.load()
 
