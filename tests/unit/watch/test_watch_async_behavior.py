@@ -467,6 +467,7 @@ class TestWatchableHandlerAsyncBehavior:
         handler = Watchable.watch_handler(obj)
 
         from syrin.watch import TriggerEvent
+
         event = TriggerEvent(input="slow", source="test")
 
         with pytest.raises(asyncio.TimeoutError):
