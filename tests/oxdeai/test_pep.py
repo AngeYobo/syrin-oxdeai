@@ -4,10 +4,12 @@ from nacl.signing import SigningKey
 
 from syrin_ext.oxdeai.canonicalize import canonicalize
 from syrin_ext.oxdeai.pep_server import (
+    InMemoryReplayStore,
     PEPConfig,
     PEPGateway,
     UpstreamExecutionError,
     UpstreamExecutionTimeout,
+    direct_upstream_call,
 )
 from syrin_ext.oxdeai.verifier import compute_intent_hash
 
@@ -51,19 +53,6 @@ def make_authorization(signing_key: SigningKey, intent_hash: str) -> dict:
             "sig": sig,
         },
     }
-
-
-def build_gateway(upstream_executor):
-    _, public_key_b64 = make_keypair()
-    # overwritten per test where needed
-    return PEPGateway(
-        config=PEPConfig(
-            expected_audience="pep-gateway.local",
-            trusted_key_sets={"issuer-1": {"auth-key-1": public_key_b64}},
-            now=1712448500,
-        ),
-        upstream_executor=upstream_executor,
-    )
 
 
 def test_pep_allow_upstream_success():
@@ -218,3 +207,63 @@ def test_pep_upstream_timeout():
     assert status == 504
     assert body["decision"] == "DENY"
     assert body["reason"] == "UPSTREAM_TIMEOUT"
+
+
+def test_pep_replay_second_use_denied():
+    action = {
+        "type": "EXECUTE",
+        "tool": "payments.charge",
+        "params": {"amount": "500", "currency": "USD", "user_id": "user_123"},
+    }
+    intent_hash = compute_intent_hash(action)
+    signing_key, public_key_b64 = make_keypair()
+    authorization = make_authorization(signing_key, intent_hash)
+    replay_store = InMemoryReplayStore()
+
+    gateway = PEPGateway(
+        config=PEPConfig(
+            expected_audience="pep-gateway.local",
+            trusted_key_sets={"issuer-1": {"auth-key-1": public_key_b64}},
+            now=1712448500,
+        ),
+        upstream_executor=lambda incoming_action: {
+            "status": "charged",
+            "tool": incoming_action["tool"],
+        },
+        replay_store=replay_store,
+    )
+
+    first_status, first_body = gateway.execute(
+        {"action": action, "authorization": authorization}
+    )
+    second_status, second_body = gateway.execute(
+        {"action": action, "authorization": authorization}
+    )
+
+    assert first_status == 200
+    assert first_body["decision"] == "ALLOW"
+    assert second_status == 403
+    assert second_body["decision"] == "DENY"
+    assert second_body["reason"] == "REPLAY_DETECTED"
+
+
+def test_direct_upstream_bypass_rejected():
+    action = {
+        "type": "EXECUTE",
+        "tool": "payments.charge",
+        "params": {"amount": "500", "currency": "USD", "user_id": "user_123"},
+    }
+
+    status, body = direct_upstream_call(
+        action=action,
+        provided_internal_token=None,
+        expected_internal_token="demo-internal-token",
+        executor=lambda incoming_action: {
+            "status": "charged",
+            "tool": incoming_action["tool"],
+        },
+    )
+
+    assert status == 403
+    assert body["decision"] == "DENY"
+    assert body["reason"] == "DIRECT_BYPASS_REJECTED"
