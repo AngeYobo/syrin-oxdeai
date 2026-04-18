@@ -5069,6 +5069,7 @@ source = { editable = "." }
 dependencies = [
     { name = "chevron" },
     { name = "croniter" },
+    { name = "fastapi" },
     { name = "httpx" },
     { name = "jsonschema" },
     { name = "opentelemetry-exporter-otlp-proto-common" },
@@ -5081,6 +5082,7 @@ dependencies = [
     { name = "requests" },
     { name = "rich" },
     { name = "tiktoken" },
+    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
@@ -5177,6 +5179,7 @@ requires-dist = [
     { name = "docling", marker = "extra == 'docling'", specifier = ">=2.78.0" },
     { name = "docling", marker = "extra == 'pdf'", specifier = ">=2.78.0" },
     { name = "elevenlabs", marker = "extra == 'voice'", specifier = ">=2.38.1" },
+    { name = "fastapi", specifier = ">=0.135.1" },
     { name = "fastapi", marker = "extra == 'serve'", specifier = ">=0.135.1" },
     { name = "flatbuffers", marker = "extra == 'knowledge'", specifier = ">=25.12.19" },
     { name = "google-genai", marker = "extra == 'generation'", specifier = ">=1.66.0" },
@@ -5212,6 +5215,7 @@ requires-dist = [
     { name = "tabulate", marker = "extra == 'docling'" },
     { name = "tabulate", marker = "extra == 'pdf'" },
     { name = "tiktoken", specifier = ">=0.12.0" },
+    { name = "uvicorn", specifier = ">=0.41.0" },
     { name = "uvicorn", marker = "extra == 'serve'", specifier = ">=0.41.0" },
     { name = "weasyprint", marker = "extra == 'pdf-output'", specifier = ">=68.1" },
 ]
